@@ -1,42 +1,45 @@
-struct LammpsDump{HD,DD,FH}
+struct LammpsDump{HD,DD}
     header_length::UInt32
     header_data::HD
     n_lines::UInt32
     n_samples::UInt32
     data_storage::DD
-    file_handle::FH
+    path::String
 end
 
-
-# mutable struct MyTest
-#     a
-#     file_handle
-#     function MyTest(a, path)
-#     file_handle = open(path, "w")
-#     finalizer(x -> close(x.file_handle), new(a, file_handle))
-#     end
-#     end
 
 function LammpsDump(path; header_length = 9)
     header_data, n_lines = parse_dump_header(path, header_length)
-    n_samples = UInt32(n_lines / (headear_data["N_atoms"] + header_length))
-
+    n_samples = UInt32(n_lines / (header_data["N_atoms"] + header_length))
     # Build dataframe to hold data -- reuse memory
-    dump_data = DataFrame(NamedTuple{Symbol.(header_data["fields"])}((zeros(header_data["N_atoms"]) 
-        for i in range(1, length(header_data["fields"])))))
+    names = tuple(Symbol.(header_data["fields"])...)
+    values = (zeros(header_data["N_atoms"]) for _ in 1:length(header_data["fields"]))
+    dump_data = DataFrame( NamedTuple{names}(values));
 
-    file_handle = open(path, "r")
-
-    return finalizer((ld) -> close(ld.file_handle), 
-        LammpsDump(header_length, header_data, n_lines, n_samples, dump_data, file_handle))
+    return LammpsDump{typeof(header_data), typeof(dump_data)}(header_length, header_data, n_lines, n_samples, dump_data, path)
 end
 
 Base.length(ld::LammpsDump) = ld.n_samples
+Base.iterate(ld::LammpsDump, state = 1) = state > length(ld) ? nothing : (parse_timestep!(ld, state), state + 1)
+haskey(ld::LammpsDump, x::String) = x ∈ names(ld.data_storage)
+get_col(ld::LammpsDump, x::String) = getproperty(ld.data_storage, Symbol(x))
 
-function Base.iterate(ld::LammpsDump, state = 1)
-    state > length(ld) ? nothing : (parse_timestep(ld, state), state + 1)
+function skiplines(path::String, num_lines)
+    io = open(path, "r")
+    for _ in range(1, num_lines)
+        skipchars(!=('\n'), io)
+        read(io, Char)
+    end
+    return io
 end
 
+function skiplines(io::IOStream, num_lines)
+    for _ in range(1, num_lines)
+        skipchars(!=('\n'), io)
+        read(io, Char)
+    end
+    return io
+end
 
 function parse_dump_header(dump_path, dump_header_len)
     file = open(dump_path, "r")
@@ -68,10 +71,12 @@ end
 
 function parse_timestep!(ld::LammpsDump, sample_number)
 
+    lines_to_skip = (sample_number - 1)*(ld.header_length + ld.header_data["N_atoms"]) + (ld.header_length)
+    io = skiplines(ld.path, lines_to_skip)
     #Parse atom data
     for j in range(1, ld.header_data["N_atoms"])
-        ld.data_storage[j,:] .= parse.(Float64, split(strip(readline(ld.file_handle))))
+        ld.data_storage[j,:] .= parse.(Float64, split(strip(readline(io))))
     end
 
-    return ld.data_storage
+    return ld
 end
