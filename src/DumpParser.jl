@@ -1,3 +1,5 @@
+export LammpsDump
+
 struct LammpsDump{HD,DD}
     header_length::UInt32
     header_data::HD
@@ -77,6 +79,23 @@ function parse_timestep!(ld::LammpsDump, sample_number)
     for j in range(1, ld.header_data["N_atoms"])
         ld.data_storage[j,:] .= parse.(Float64, split(strip(readline(io))))
     end
+    close(io)
+
+    return ld
+end
+
+"""
+Converts atomic coordinates stored in `ld` into unwrapped coordinates. The data
+passed to `reference_data` are used to re-calculate the
+image flags and unwrapped coordiantes relative to the last time INMs were reset.
+"""
+function unwrap_coordinates!(ld::LammpsDump, reference_data::DataFrame, box_sizes::AbstractVector)
+
+    #Modify image flags in current step to reflect INM resets
+    ld.data_storage[!, ["ix","iy","iz"]] .-= reference_data[!, ["ix","iy","iz"]]
+
+    #Replace coordiantes in ld with un-wrapped coordinates
+    ld.data_storage[!, ["x","y","z"]] .+= (ld.data_storage[:, ["ix","iy","iz"]] .* box_sizes)
 
     return ld
 end

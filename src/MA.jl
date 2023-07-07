@@ -33,15 +33,16 @@ function InstantaneousNormalModeAnalysis(dump_file_paths, thermo_data_file_paths
 end
 
 # This function is bottle neck, specifically F3_2_K3
-function calculate_modes(r0, potential, masses, L; tol = 1e-12)
-    Φ = second_order_IFC(r0, potential, length(r0), L, tol);
-    Ψ = third_order_IFC(r0, potential, length(r0), L, tol);
-    Ψ_sparse_mw = to_sparse_mw(Ψ, masses)
-    dynmat = IFC2_dynmat(Φ, masses)
-    freqs, phi = parseDynmat(dynmat)
+function get_modal_data(sys, potential; tol = 1e-12)
+    dynmat = dynamicalMatrix(sys, potential, tol)
+    freqs_sq, phi = get_modes(dynmat)
+
+    Ψ = third_order_IFC(sys, potential, tol);
+    Ψ_sparse_mw = mass_weight_sparsify_third_order(Ψ, masses(sys))
+
     K3 = F3_2_K3(Ψ_sparse_mw, phi, length(r0), tol);
     
-    return freqs, phi, K3
+    return freqs_sq, phi, K3
 end
 
 function split_work(dump_file_paths::Vector{String}, wss::SplitByParameter)
