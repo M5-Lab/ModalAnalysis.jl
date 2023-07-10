@@ -1,5 +1,7 @@
+export INMA
 
-function INM_loop(ld::LammpsDump, pair_potential::Potential, potential_eng_MD, masses, max_deviation, out_basepath)
+
+function INMA(ld::LammpsDump, pair_potential::Potential, potential_eng_MD, masses, max_deviation, out_basepath, T_des, kB)
    
     #Assumes 3D
     box_sizes = [ld.header_data["L_x"][2],ld.header_data["L_y"][2],ld.header_data["L_z"][2]]
@@ -47,7 +49,7 @@ function INM_loop(ld::LammpsDump, pair_potential::Potential, potential_eng_MD, m
         
         #Calculate displacements
         ld = unwrap_coordinates!(ld, reference_data, box_sizes)
-        disp = reference_data[!, ["x","y","z"]] .- reference_data[!, ["x","y","z"]]
+        disp = ld.data_storage[!, ["x","y","z"]] .- reference_data[!, ["x","y","z"]]
         for i in eachindex(masses) disp[i] .*= sqrt(masses[i]) end
         disp_mw = reduce(vcat, disp_mw)
 
@@ -82,48 +84,15 @@ function INM_loop(ld::LammpsDump, pair_potential::Potential, potential_eng_MD, m
     jldopen(joinpath(out_basepath, "INMA.jld2"), "a+") do file
         file["total_eng_INM"] = total_eng_INM
         file["steps_btwn_reset"] = steps_btwn_reset
+        file["avg_reset_time"] = mean(steps_btwn_reset)
         file["potential_eng_MD"] = potential_eng_MD
+        file["cv_MD_total"] = var(potential_eng_MD)/(kB*T_des*T_des)
+        file["cv_TEP_total"] = var(total_eng_INM)/(kB*T_des*T_des)
         file["params/max_deviation"] = max_deviation
+        file["params/T_des"] = ustrip(T_des)
+        file["params/kB"] = ustrip(kB)
     end
 
     return total_eng_INM, steps_btwn_reset
 
 end
-
-# performs 1 INM loop and does necessary post processing
-function INM_analysis(ld::LammpsDump, pair_potential::Potential, potential_eng_MD, masses, max_deviation, out_basepath, T_des)
-
-    total_eng_INM, steps_btwn_reset =
-        INM_loop(ld, pair_potential, potential_eng_MD, masses, max_deviation, out_basepath);
-
-    #Calculate system heat capacity predicted by INMs
-    cv_INM = var(total_eng_INM)/(length(r_out[1,:])*T_des*T_des)
-
-    #Get distribution of resets
-    avg_reset_time = mean(steps_btwn_reset)
-
-end
-
-
-# function bin_energies()
-
-#     dω = 0.5
-#     bin_centers = [0.5*dω*i for i in range(-15,25)]
-#     energy_bins_2nd_order = Vector{Vector{Float64}}(undef,length(bin_centers))
-#     energy_bins_3rd_order = Vector{Vector{Float64}}(undef,length(bin_centers))
-
-
-#     for n in range(1,N_atoms) #technically N_modes
-#         ω = freqs[n]
-#         bin_idx = argmin(abs.(bin_centers .- ω))
-        
-#         #TODO: JUST WRITE TO FILE DONT BIN HERE
-#         if !isassigned(energy_bins_2nd_order, bin_idx)
-#             energy_bins_2nd_order[bin_idx] = [mode_potential_order2[n]]
-#             energy_bins_3rd_order[bin_idx] = [mode_potential_order3[n]]
-#         else
-#             push!(energy_bins_2nd_order[bin_idx], mode_potential_order2[n])
-#             push!(energy_bins_3rd_order[bin_idx], mode_potential_order3[n])
-#         end
-#     end  
-# end

@@ -58,3 +58,29 @@
 # end
 
 # imshow(ks_matrix)
+
+### Bin energies
+
+
+# function bin_energies()
+
+#     dω = 0.5
+#     bin_centers = [0.5*dω*i for i in range(-15,25)]
+#     energy_bins_2nd_order = Vector{Vector{Float64}}(undef,length(bin_centers))
+#     energy_bins_3rd_order = Vector{Vector{Float64}}(undef,length(bin_centers))
+
+
+#     for n in range(1,N_atoms) #technically N_modes
+#         ω = freqs[n]
+#         bin_idx = argmin(abs.(bin_centers .- ω))
+        
+#         #TODO: JUST WRITE TO FILE DONT BIN HERE
+#         if !isassigned(energy_bins_2nd_order, bin_idx)
+#             energy_bins_2nd_order[bin_idx] = [mode_potential_order2[n]]
+#             energy_bins_3rd_order[bin_idx] = [mode_potential_order3[n]]
+#         else
+#             push!(energy_bins_2nd_order[bin_idx], mode_potential_order2[n])
+#             push!(energy_bins_3rd_order[bin_idx], mode_potential_order3[n])
+#         end
+#     end  
+# end

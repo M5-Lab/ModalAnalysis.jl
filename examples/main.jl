@@ -24,5 +24,8 @@ out_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_2UC\"
 T_des = 10.0u"K"
 max_deviation = 0.01*mean(potential_eng_MD)
 
-INM_analysis(ld, pot, potential_eng_MD,
- masses, max_deviation, out_path, T_des)
+#Dump needs xu,yu,zu
+NMA(ld, pot, potential_eng_MD, masses, out_path, T_des, kB)
+
+#Dump needs x, y, z, ix, iy, iz, fx, fy, fz
+INMA(ld, pot, potential_eng_MD, masses, max_deviation, out_path, T_des, kB)

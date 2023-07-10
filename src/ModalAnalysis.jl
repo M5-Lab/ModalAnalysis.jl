@@ -2,6 +2,7 @@ module ModalAnalysis
 
 using DataFrames
 using TensorOperations
+using LoopVectorization
 
 #TODO: register online
 using ForceConstants
