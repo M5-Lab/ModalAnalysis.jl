@@ -1,4 +1,4 @@
-export LammpsDump
+export LammpsDump, parse_timestep!, get_col
 
 struct LammpsDump{HD,DD}
     header_length::UInt32

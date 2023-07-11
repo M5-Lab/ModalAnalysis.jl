@@ -6,6 +6,7 @@ version = "0.1.0"
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 ForceConstants = "58688e27-5ad4-4797-95f1-2920f5d19b53"
+LoopVectorization = "bdcacae8-1622-11e9-2a5c-532679323890"
 TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
 
 [compat]

@@ -9,6 +9,10 @@ using ForceConstants
 
 # Code to evaluate TEP
 module TEP
+    using TensorOperations
+    using ForceConstants
+    using LoopVectorization
+
     include("./TEP/TEP.jl")
 end
 using .TEP

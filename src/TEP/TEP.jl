@@ -8,9 +8,9 @@ function U_TEP3_n(F3, u, n)
 end
 
 
-function U_TEP3_n(F3::ThirdOrderSparse)
+# function U_TEP3_n(F3::ThirdOrderSparse)
 
-end
+# end
 
 
 

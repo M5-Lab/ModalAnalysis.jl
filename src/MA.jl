@@ -39,9 +39,9 @@ function get_modal_data(sys, potential; tol = 1e-12)
 
     Ψ = third_order_IFC(sys, potential, tol);
     Ψ_sparse_mw = mass_weight_sparsify_third_order(Ψ, masses(sys))
-
-    # This only gives upper 1/6th of K3 Tensor
-    K3 = F3_2_K3(Ψ_sparse_mw, phi, length(r0), tol);
+    # println(length(Ψ_sparse_mw.values))
+    # println(size(phi))
+    K3 = to_mcc(Ψ_sparse_mw, phi, tol, 0);
     
     return freqs_sq, phi, K3
 end

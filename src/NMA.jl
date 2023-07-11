@@ -1,14 +1,21 @@
 export NMA
 
-function NMA(ld::LammpsDump, pair_potential::Potential, potential_eng_MD, masses, out_basepath, T_des, kB)
+"""
+Takes equilibrium positions and calcultes force constants and modal coupling constsants. These values
+are to consturct the Taylor Effective Potential using data from a LAMMPS simulation.
+
+ - eq::LammpsDump : Equilibrium data parsed from dump file
+ - ld::LammpsDump : Simulation data parsed from dump file
+"""
+function NMA(eq::LammpsDump, ld::LammpsDump, pair_potential::Potential, potential_eng_MD, masses, out_basepath, T_des, kB)
    
     #Assumes 3D
     box_sizes = [ld.header_data["L_x"][2],ld.header_data["L_y"][2],ld.header_data["L_z"][2]]
     N_modes = 3*length(masses)
 
-    sys = SuperCellSystem(ld.data_storage, masses, box_sizes, "xu", "yu", "zu")
+    sys = SuperCellSystem(eq.data_storage, masses, box_sizes, "x", "y", "z")
 
-    # Initialize INMs to 3rd Order
+    # Initialize NMs to 3rd Order
     freqs_sq, phi, K3 = get_modal_data(sys, pair_potential)
     
     #Save mode data
@@ -38,7 +45,7 @@ function NMA(ld::LammpsDump, pair_potential::Potential, potential_eng_MD, masses
         q_anharmonic = phi' * disp_mw;
 
         #Calculate energy from INMs at timestep i
-        mode_potential_order2 .= (-f0_nmc.*q_anharmonic) .+ 0.5.*(freqs_sq .* (q_anharmonic.^2))
+        mode_potential_order2 .= 0.5.*(freqs_sq .* (q_anharmonic.^2))
         mode_potential_order3 .= mode_potential_order2 .+ U_TEP3_n.(Ref(K3), Ref(q_anharmonic), range(1,N_modes))
         total_eng_NM[i]  = sum(mode_potential_order3) + potential_eng_MD[firstindex(potential_eng_MD)]
                
