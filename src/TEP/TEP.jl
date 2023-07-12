@@ -1,3 +1,5 @@
+export U_TEP3_n
+
 function U_TEP3_n(F3, u, n)
     F3_view = view(F3, :, :, n)
     u_n = u[n]

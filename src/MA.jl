@@ -38,18 +38,14 @@ function get_modal_data(sys, potential; tol = 1e-12)
     freqs_sq, phi = get_modes(dynmat)
 
     Ψ = third_order_IFC(sys, potential, tol);
+    @info "IFC3 calculation complete"
     Ψ_sparse_mw = mass_weight_sparsify_third_order(Ψ, masses(sys))
     # println(length(Ψ_sparse_mw.values))
     # println(size(phi))
     K3 = to_mcc(Ψ_sparse_mw, phi, tol, 0);
-    
+    @info "MCC3 calculation complete"
     return freqs_sq, phi, K3
 end
 
-"""
-Takes the output from ForceConstants.jl and splits up
-"""
-function sort_mcc_by_mode(K3)
-
-end
+ 
 

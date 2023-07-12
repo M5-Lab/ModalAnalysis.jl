@@ -10,6 +10,8 @@ function INMA(ld::LammpsDump, pair_potential::Potential, potential_eng_MD, masse
     recalculate_INMs = true
     recalculation_idxs = [1]
 
+    dump_file = open(ld.path, "r")
+
     #Pre-allocate
     f0_nmc = zeros(N_modes)
     mode_potential_order2 = zeros(N_modes, N_steps)
@@ -19,7 +21,7 @@ function INMA(ld::LammpsDump, pair_potential::Potential, potential_eng_MD, masse
     recalc_counter = 1
     for i in eachindex(potential_eng_MD)
 
-        ld = parse_timestep!(ld, i)
+        ld, dump_file = parse_next_timestep!(ld, dump_file)
 
         if recalculate_INMs
             #Build system with current positions
@@ -92,6 +94,8 @@ function INMA(ld::LammpsDump, pair_potential::Potential, potential_eng_MD, masse
         file["params/T_des"] = ustrip(T_des)
         file["params/kB"] = ustrip(kB)
     end
+
+    close(dump_file)
 
     return total_eng_INM, steps_btwn_reset
 

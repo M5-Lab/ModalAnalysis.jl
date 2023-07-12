@@ -12,7 +12,7 @@ using DelimitedFiles
 ###############
 # NMA EXAMPLE #
 ###############
-base_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_2UC\NMA"
+base_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_3UC\NMA"
 equilibrium_data_path = joinpath(base_path, "equilibrium.atom")
 dump_path = joinpath(base_path, "dump.atom")
 thermo_path = joinpath(base_path,"thermo_data.txt")
@@ -37,7 +37,7 @@ T_des = 10.0
 
 #Dump needs xu,yu,zu
 kB = ustrip(u"kcal * mol^-1 * K^-1", Unitful.k*Unitful.Na)
-NMA(eq, ld, pot, potential_eng_MD, masses, out_path, T_des, kB)
+ProfileView.@profview NMA(eq, ld, pot, potential_eng_MD, masses, out_path, T_des, kB)
 
 
 ###############

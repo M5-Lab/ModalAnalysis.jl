@@ -1,4 +1,4 @@
-export LammpsDump, parse_timestep!, get_col
+export LammpsDump, parse_timestep!, parse_next_timestep!, get_col
 
 struct LammpsDump{HD,DD}
     header_length::UInt32
@@ -22,7 +22,7 @@ function LammpsDump(path; header_length = 9)
 end
 
 Base.length(ld::LammpsDump) = ld.n_samples
-Base.iterate(ld::LammpsDump, state = 1) = state > length(ld) ? nothing : (parse_timestep!(ld, state), state + 1)
+# Base.iterate(ld::LammpsDump, state = 1) = state > length(ld) ? nothing : (parse_timestep!(ld, state), state + 1)
 haskey(ld::LammpsDump, x::String) = x ∈ names(ld.data_storage)
 get_col(ld::LammpsDump, x::String) = getproperty(ld.data_storage, Symbol(x))
 
@@ -35,10 +35,10 @@ function skiplines(path::String, num_lines)
     return io
 end
 
-function skiplines(io::IOStream, num_lines)
+function readlines_until(path::String, num_lines)
+    io = open(path, "r")
     for _ in range(1, num_lines)
-        skipchars(!=('\n'), io)
-        read(io, Char)
+        readline(io)
     end
     return io
 end
@@ -71,6 +71,10 @@ function parse_dump_header(dump_path, dump_header_len)
     return header_data, n_lines
 end
 
+"""
+Opens dump file and pulls out specific sample of data. This is expensive 
+if the file is long. 
+"""
 function parse_timestep!(ld::LammpsDump, sample_number)
 
     lines_to_skip = (sample_number - 1)*(ld.header_length + ld.header_data["N_atoms"]) + (ld.header_length)
@@ -82,6 +86,23 @@ function parse_timestep!(ld::LammpsDump, sample_number)
     close(io)
 
     return ld
+end
+
+"""
+Parse next timestep from `io` and stores it in `ld`. 
+"""
+function parse_next_timestep!(ld::LammpsDump, io::IOStream)
+    
+    #Skip header 
+    for _ in range(1, ld.header_length) readline(io) end
+
+    #Parse atom data
+    for j in range(1, ld.header_data["N_atoms"])
+        ld.data_storage[j,:] .= parse.(Float64, split(strip(readline(io))))
+    end
+
+    return ld, io
+
 end
 
 """

@@ -3,6 +3,8 @@ module ModalAnalysis
 using DataFrames
 using TensorOperations
 using LoopVectorization
+using JLD2
+using StatsBase
 
 #TODO: register online
 using ForceConstants
