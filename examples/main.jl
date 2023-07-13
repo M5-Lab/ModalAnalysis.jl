@@ -9,10 +9,13 @@ using Unitful
 using ForceConstants
 using DelimitedFiles
 
+#TODO: get it to handle units
+#TODO: write data in another CPU thread??
+
 ###############
 # NMA EXAMPLE #
 ###############
-base_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_3UC\NMA"
+base_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_4UC\NMA"
 equilibrium_data_path = joinpath(base_path, "equilibrium.atom")
 dump_path = joinpath(base_path, "dump.atom")
 thermo_path = joinpath(base_path,"thermo_data.txt")
@@ -36,9 +39,11 @@ out_path = base_path
 T_des = 10.0
 
 #Dump needs xu,yu,zu
+TEP_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_4UC\NMA_rightK3_wrong_data.jld2"
 kB = ustrip(u"kcal * mol^-1 * K^-1", Unitful.k*Unitful.Na)
-ProfileView.@profview NMA(eq, ld, pot, potential_eng_MD, masses, out_path, T_des, kB)
+NMA(eq, ld, potential_eng_MD, masses, out_path, T_des, kB, TEP_path)
 
+# ProfileView.@profview
 
 ###############
 # INMA EXAMPLE #

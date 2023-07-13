@@ -42,10 +42,17 @@ function get_modal_data(sys, potential; tol = 1e-12)
     Ψ_sparse_mw = mass_weight_sparsify_third_order(Ψ, masses(sys))
     # println(length(Ψ_sparse_mw.values))
     # println(size(phi))
-    K3 = to_mcc(Ψ_sparse_mw, phi, tol, 0);
+    @time K3 = to_mcc(Ψ_sparse_mw, phi, tol, 0);
     @info "MCC3 calculation complete"
     return freqs_sq, phi, K3
 end
 
  
+# function start_write_thread(results::RemoteChannel)
 
+#     Thread.@spawn begin
+#         take!(results)
+        
+#     end
+
+# end
