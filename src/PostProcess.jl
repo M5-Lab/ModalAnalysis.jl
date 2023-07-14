@@ -42,7 +42,7 @@ function NM_postprocess(energies_path::String, tep_path::String,
         end
     end
 
-    cv3_per_mode= sum(cv3_cov, dims = 2);
+    cv3_per_mode = sum(cv3_cov, dims = 2);
     cv3_total = sum(cv3_per_mode)
 
     if average_identical_freqs
@@ -54,9 +54,9 @@ function NM_postprocess(energies_path::String, tep_path::String,
         end
 
         f = Figure()
-        Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"Mode Heat Capacity / k_{\text{B}}",
-            title = "Heat Capacity per Mode: T = $T (avg by freq)")
-        scatter!(unique_freqs, cv3_avg);
+        Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\frac{c_{V,mode}}{k_{\text{B}}}",
+            title = "Heat Capacity per Mode Avg by Freq: T = $(round(T,sigdigits = 4))")
+        scatter!(unique_freqs, vec(cv3_avg));
         save(joinpath(energies_path,"heat_cap_per_mode_avg_freq.svg"), f)
     end
 
@@ -64,7 +64,7 @@ function NM_postprocess(energies_path::String, tep_path::String,
     f = Figure()
     Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"Mode Heat Capacity / k_{\text{B}}",
         title = "Heat Capacity per Mode: T = $T")
-    scatter!(freqs,cv3_per_mode);
+    scatter!(freqs, cv3_per_mode);
     save(joinpath(energies_path,"heat_cap_per_mode.svg"), f)
     
     #Sanity check
@@ -73,7 +73,7 @@ function NM_postprocess(energies_path::String, tep_path::String,
     end
 
     #Save heat capacity data
-    jldsave(joinpath(NM_analysis_folder, "cv_data.jld2"), 
+    jldsave(joinpath(energies_path, "cv_data.jld2"), 
         cv_total_MD = cv_total_MD, cv3_total = cv3_total,
         cv3_per_mode = cv3_per_mode, cv3_cov = cv3_cov)
 
