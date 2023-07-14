@@ -56,7 +56,7 @@ function NM_postprocess(energies_path::String, tep_path::String,
         f = Figure()
         Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"Mode Heat Capacity / k_{\text{B}}",
             title = "Heat Capacity per Mode: T = $T (avg by freq)")
-        scatter!(freqs, cv3_avg);
+        scatter!(unique_freqs, cv3_avg);
         save(joinpath(energies_path,"heat_cap_per_mode_avg_freq.svg"), f)
     end
 
