@@ -53,7 +53,7 @@ end
 function NMA_loop(eq::LammpsDump, ld::LammpsDump, 
      potential_eng_MD, masses, out_basepath, freqs_sq, phi, K3)
 
-    N_modes = 3*length(masses)
+    N_modes = length(freqs_sq)
 
     dump_file = open(ld.path, "r")
     initial_positions = Matrix(eq.data_storage[!, ["x","y","z"]])
