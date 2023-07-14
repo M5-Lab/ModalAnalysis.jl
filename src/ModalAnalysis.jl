@@ -1,5 +1,6 @@
 module ModalAnalysis
 
+using CairoMakie
 using DataFrames
 using TensorOperations
 using LoopVectorization
@@ -23,7 +24,7 @@ include("DumpParser.jl")
 include("MA.jl")
 include("INMA.jl")
 include("NMA.jl")
-# include("PostProcess.jl")
+include("PostProcess.jl")
 # include("WorkSplittingStrategies.jl")
 
 

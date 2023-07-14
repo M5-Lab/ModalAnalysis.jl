@@ -1,65 +1,99 @@
-# using HypothesisTests
-# using JLD2
-# using Plots
-# using ImageView
-# using StatsBase
+export NM_postprocess
 
-# base_path = raw"C:\Users\ejmei\Desktop\INM_test\MD_simulations_heroic\sim_T_0.1_LJ"
-# n_seeds = length(readdir(base_path))
+function NM_postprocess(energies_path::String, tep_path::String, 
+        kB, T, N_modes; nthreads::Integer = Threads.nthreads(), average_identical_freqs = true)
 
-# @info "Num Seeds: $(n_seeds)"
+    NMA_filepath = joinpath(energies_path, "ModeEnergies.jld2")
+    TEP_filepath = joinpath(tep_path, "TEP.jld2")
 
-# #Look at MD data
-# pe_all = []
-# for i in range(1, n_seeds)
-#     pe = load(joinpath(base_path,"seed$i","MD_energies.jld2"), "pe")
-#     push!(pe_all, pe)
-# end
-# pe_all = Iterators.flatten(pe_all);
-# # histogram(collect(pe_all), dpi = 300)
+    potential_eng_MD, potential_eng_TEP, mode_potential_order3 =
+        load(NMA_filepath, "potential_eng_MD", "total_eng_NM", "mode_potential_order3")
+    freqs_sq, phi = load(TEP_filepath, "freqs_sq", "phi")
 
-# #Average Heat Capacity Data
-# N_modes = 48
-# cov_matrix_all = zeros(N_modes, N_modes)
-# cv_actual_avg = 0.0
-# cv3_total_avg = 0.0
-# for i in range(1, n_seeds)
-#     cv3_cov, cv3_total, cv_total_actual = load(joinpath(base_path,"seed$i","NM_Analysis","cv_data.jld2"),
-#          "cv3_cov", "cv3_total", "cv_total_actual")
-#     cov_matrix_all += cv3_cov
-#     cv3_total_avg += cv3_total
-#     cv_actual_avg += cv_total_actual
-# end
-# cov_matrix_all ./= n_seeds #Avg cv per mode from TEP3
-# cv_actual_avg /= n_seeds #Avg cv from MD energy
-# cv3_total_avg /= n_seeds #Avg cv from TEP3 energy
+    if any(freqs_sq .< 0.0)
+        freqs = imag_to_neg(sqrt.(Complex.(freqs_sq)))
+    else
+        freqs = sqrt.(freqs_sq)
+    end
 
-# cv3 = sum(cov_matrix_all, dims = 2)
+    #Bulk heat capacities
+    cv_total_MD = var(potential_eng_MD)/(kB*T*T)
+    cv_TEP_total = var(potential_eng_TEP)/(kB*T*T)
 
-# #Color code by e-vec direction
-# freqs, phi = load(joinpath(base_path,"seed1","NM_Analysis","NormalModes.jld2"), "freqs", "phi")
-# freqs = real(freqs)
+    #Save system level energy histograms
+    f = Figure()
+    Axis(f[1,1], xlabel = "Potential Energy", ylabel = "Count")
+    s1 = stephist!(potential_eng_MD); s2 = stephist!(potential_eng_TEP)
+    Legend(f[1,2], [s1,s2], ["MD", "TEP"], "Energy Calculator")
+    save(joinpath(energies_path,"pot_eng_hist.svg"), f)
 
-# scatter(freqs, cv3)
-# xlabel!("Mode Frequency")
-# ylabel!("Mode Heat Capacity")
+    #Write per-mode data to file
+    cv3_cov = zeros(N_modes, N_modes)
+    Threads.@threads for thread_id in 1:nthreads
+        for n in thread_id:nthreads:N_modes
 
-# #Average on Duplicate Freqs
+            cv3_cov[n,n] = var(mode_potential_order3[n,:])/(kB*T*T)
 
-# freqs_unique = unique(round.(freqs,sigdigits = 5))
-# cv_avg = (cv3[2:2:end-1] .+ cv3[3:2:end-1]) ./ 2
-# prepend!(cv_avg, cv3[1])
-# push!(cv_avg, cv3[end])
+            #Covariance terms
+            for m in range(n+1,N_modes)
+                @views cv3_cov[n,m] = cov(mode_potential_order3[n,:], mode_potential_order3[m,:])/(kB*T*T)
+                cv3_cov[m,n] = cv3_cov[n,m]
+            end
+        end
+    end
 
-# plt = scatter(freqs_unique, cv_avg, dpi = 300, ylim = (0.0,0.55))
-# xlabel!("Mode Frequency")
-# ylabel!("Mode Heat Capacity")
-# title!("100 Seeds")
-# display(plt)
+    cv3_per_mode= sum(cv3_cov, dims = 2);
+    cv3_total = sum(cv3_per_mode)
 
-# imshow(cov_matrix_all)
+    if average_identical_freqs
+        unique_freqs = unique(round.(freqs, sigdigits = 5))
+        cv3_avg = zeros(length(unique_freqs))
+        for (i, f) in enumerate(unique_freqs)
+            idxs = findall(x -> x == f, freqs)
+            cv3_avg[i] = sum(cv3_per_mode[idxs])/length(idxs)
+        end
 
+        f = Figure()
+        Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"Mode Heat Capacity / k_{\text{B}}",
+            title = "Heat Capacity per Mode: T = $T (avg by freq)")
+        scatter!(freqs, cv3_avg);
+        save(joinpath(energies_path,"heat_cap_per_mode_avg_freq.svg"), f)
+    end
 
+    #Plot mode heat capacities -- raw output
+    f = Figure()
+    Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"Mode Heat Capacity / k_{\text{B}}",
+        title = "Heat Capacity per Mode: T = $T")
+    scatter!(freqs,cv3_per_mode);
+    save(joinpath(energies_path,"heat_cap_per_mode.svg"), f)
+    
+    #Sanity check
+    if !isapprox(cv3_total, cv_TEP_total, atol = 1e-4)
+        @warn "Sum of modal heat capacities ($(cv3_total)) does not match heat capacity from total TEP energy ($(cv_TEP_total))"
+    end
+
+    #Save heat capacity data
+    jldsave(joinpath(NM_analysis_folder, "cv_data.jld2"), 
+        cv_total_MD = cv_total_MD, cv3_total = cv3_total,
+        cv3_per_mode = cv3_per_mode, cv3_cov = cv3_cov)
+
+end
+
+function average_seeds()
+
+end
+
+function imag_to_neg(freqs)
+    freqs_float = zeros(size(freqs))
+    for i in eachindex(freqs)
+        if real(freqs[i]) == 0
+            freqs_float[i] = -1*imag(freqs[i])
+        else
+            freqs_float[i] = real(freqs[i])
+        end
+    end
+    return freqs_float
+end
 
 # #############################################
 
@@ -145,3 +179,14 @@
 #         end
 #     end  
 # end
+
+
+function resample_CLT(energy)
+    N_steps = length(energy)
+    N_samples = N_steps ÷ 10
+    M = 500
+    energy_samples = sample(energy,(N_samples,M))
+    energy_samples = mean(energy_samples,dims = 2)
+
+    return M, energy_samples
+end

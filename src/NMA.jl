@@ -13,7 +13,7 @@ the freqs, phi & K3 will be loaded from another simulation to avoid re-calculati
  - ld::LammpsDump : Simulation data parsed from dump file
 """
 function NMA(eq::LammpsDump, ld::LammpsDump, pair_potential::Potential, potential_eng_MD,
-     masses, out_basepath::String, T_des, kB)
+     masses, out_basepath::String)
    
     #Assumes 3D
     box_sizes = [ld.header_data["L_x"][2],ld.header_data["L_y"][2],ld.header_data["L_z"][2]]
@@ -30,22 +30,28 @@ function NMA(eq::LammpsDump, ld::LammpsDump, pair_potential::Potential, potentia
         file["K3"] = K3
     end
 
-    NMA_loop(eq, ld, potential_eng_MD, masses, out_basepath, T_des, kB, freqs_sq, phi, K3)
+    NMA_loop(eq, ld, potential_eng_MD, masses, out_basepath, freqs_sq, phi, K3)
 end
 
 
 function NMA(eq::LammpsDump, ld::LammpsDump, potential_eng_MD,
-     masses, out_basepath::String, T_des, kB, TEP_path::String)
+     masses, out_basepath::String, TEP_path::String)
 
     # Load data
     freqs_sq, phi, K3 = load(TEP_path, "freqs_sq", "phi", "K3")
+
+    #Always save a copy of freqs and phi for post processing stuff
+    jldopen(joinpath(out_basepath, "TEP.jld2"), "a+") do file
+        file["freqs_sq"] = freqs_sq
+        file["phi"] = phi
+    end
     
-    NMA_loop(eq, ld, potential_eng_MD, masses, out_basepath, T_des, kB, freqs_sq, phi, K3)
+    NMA_loop(eq, ld, potential_eng_MD, masses, out_basepath, freqs_sq, phi, K3)
 end
 
 
 function NMA_loop(eq::LammpsDump, ld::LammpsDump, 
-     potential_eng_MD, masses, out_basepath, T_des, kB, freqs_sq, phi, K3)
+     potential_eng_MD, masses, out_basepath, freqs_sq, phi, K3)
 
     N_modes = 3*length(masses)
 
@@ -83,59 +89,8 @@ function NMA_loop(eq::LammpsDump, ld::LammpsDump,
         file["mode_potential_order3"] = mode_potential_order3
         file["total_eng_NM"] = total_eng_NM
         file["potential_eng_MD"] = potential_eng_MD
-        file["cv_MD_total"] = var(potential_eng_MD)/(kB*T_des*T_des)
-        file["cv_TEP_total"] = var(total_eng_NM)/(kB*T_des*T_des)
     end
 
     close(dump_file)
 end
 
-
-function NM_postprocess(out_basepath, T, N_dof, kB)
-
-    NMA_filepath = joinpath(out_basepath, "NMA.jld2")
-
-    potential_eng_MD, order3_total, cv_total_MD, cv_total_TEP =
-         load(NMA_filepath, "potential_eng_MD", "total_eng_NM", "cv_MD_total", "cv_TEP_total")
-
-    order2_modal, order3_modal, order2_total, order3_total =
-        load(joinpath(NM_analysis_folder, "NM_energies.jld2"),
-        "order2", "order3", "total_order2", "total_order3")
-
-    #Save system level energy histograms
-    plt = stephist([potential_eng_MD, order2_total, order3_total], line=(1,0.2,:white),
-        fillcolor=[:blue :red :green], fillalpha=0.4, label = ["MD" "TEP2" "TEP3"], dpi = 300)
-    xlabel!("Potential Energy")
-    ylabel!("Count")
-    savefig(plt, joinpath(NM_analysis_folder, "pot_eng_hist.png"))
-
-    mode_histogram_outpath = joinpath(NM_analysis_folder, "ModeEnergyHistograms")
-    mkpath(mode_histogram_outpath)
-
-    #Write per-mode data to file
-    cv_cov_TEP = zeros(N_dof, N_dof)
-    for n in range(1,N_dof)
-
-        cv3_cov[n,n] = var(order3_modal[n,:])/(kB*T*T)
-
-        # lock(lk)
-        # @views histogram([order2_modal[n,:], order3_modal[n,:]], line=(1,0.2,:white),
-        #     fillcolor=[:blue :red], fillalpha=0.4, label = ["Order 2" "Order 3"], dpi = 300)
-        # xlabel!("Potential Energy")
-        # ylabel!("Count")
-        # savefig(joinpath(mode_histogram_outpath, "mode$(n)_hist.png"))
-        # unlock(lk)
-
-        #Covariance terms
-        for m in range(n+1,N_dof)
-            @views cv3_cov[n,m] = cov(order3_modal[n,:], order3_modal[m,:])/(kB*T*T)
-            cv3_cov[m,n] = cv3_cov[n,m]
-        end
-    end
-
-    jldsave(joinpath(NM_analysis_folder, "cv_data.jld2"), 
-    cv_total_MD = cv_total_MD, cv_total_TEP = cv_total_TEP, cv_cov_TEP = cv_cov_TEP)
-
-    #Return totals
-    return cv_total_actual, cv3_total, sum(cv2_cov), sum(cv3_cov)
-end

@@ -33,7 +33,7 @@ and Normal Mode Analysis (NMA.jl).
 # end
 
 # This function is bottle neck, specifically F3_2_K3
-function get_modal_data(sys, potential; tol = 1e-12)
+function get_modal_data(sys, potential; gpu_device_id = 0, tol = 1e-12)
     dynmat = dynamicalMatrix(sys, potential, tol)
     freqs_sq, phi = get_modes(dynmat)
 
@@ -42,7 +42,7 @@ function get_modal_data(sys, potential; tol = 1e-12)
     Ψ_sparse_mw = mass_weight_sparsify_third_order(Ψ, masses(sys))
     # println(length(Ψ_sparse_mw.values))
     # println(size(phi))
-    @time K3 = to_mcc(Ψ_sparse_mw, phi, tol, 0);
+    @time K3 = to_mcc(Ψ_sparse_mw, phi, tol, gpu_device_id);
     @info "MCC3 calculation complete"
     return freqs_sq, phi, K3
 end
