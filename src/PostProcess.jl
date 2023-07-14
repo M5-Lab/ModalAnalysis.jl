@@ -15,6 +15,7 @@ function NM_postprocess(energies_path::String, tep_path::String,
     else
         freqs = sqrt.(freqs_sq)
     end
+    freqs = round.(freqs, sigdigits = 5)
 
     #Bulk heat capacities
     cv_total_MD = var(potential_eng_MD)/(kB*T*T)
@@ -22,7 +23,7 @@ function NM_postprocess(energies_path::String, tep_path::String,
 
     #Save system level energy histograms
     f = Figure()
-    Axis(f[1,1], xlabel = "Potential Energy", ylabel = "Count")
+    ax = Axis(f[1,1], xlabel = "Potential Energy", ylabel = "Count")
     s1 = stephist!(potential_eng_MD); s2 = stephist!(potential_eng_TEP)
     Legend(f[1,2], [s1,s2], ["MD", "TEP"], "Energy Calculator")
     save(joinpath(energies_path,"pot_eng_hist.svg"), f)
@@ -41,32 +42,32 @@ function NM_postprocess(energies_path::String, tep_path::String,
             end
         end
     end
-
     cv3_per_mode = sum(cv3_cov, dims = 2);
     cv3_total = sum(cv3_per_mode)
 
     if average_identical_freqs
-        unique_freqs = unique(round.(freqs, sigdigits = 5))
-        cv3_avg = zeros(length(unique_freqs))
+        unique_freqs = unique(freqs)
+        cv3_avg_freq = zeros(length(unique_freqs))
         for (i, f) in enumerate(unique_freqs)
             idxs = findall(x -> x == f, freqs)
-            cv3_avg[i] = sum(cv3_per_mode[idxs])/length(idxs)
+            cv3_avg_freq[i] = sum(cv3_per_mode[idxs])/length(idxs)
         end
 
         f = Figure()
-        Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\frac{c_{V,mode}}{k_{\text{B}}}",
+        Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\text{Mode Heat Capacity / }k_{\text{B}}",
             title = "Heat Capacity per Mode Avg by Freq: T = $(round(T,sigdigits = 4))")
-        scatter!(unique_freqs, vec(cv3_avg));
+        scatter!(unique_freqs, vec(cv3_avg_freq));
         save(joinpath(energies_path,"heat_cap_per_mode_avg_freq.svg"), f)
     end
 
     #Plot mode heat capacities -- raw output
     f = Figure()
-    Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"Mode Heat Capacity / k_{\text{B}}",
+    ax = Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\text{Mode Heat Capacity / }k_{\text{B}}",
         title = "Heat Capacity per Mode: T = $T")
-    scatter!(freqs, cv3_per_mode);
+    scatter!(freqs, vec(cv3_per_mode));
     save(joinpath(energies_path,"heat_cap_per_mode.svg"), f)
-    
+
+    @info "HERE"
     #Sanity check
     if !isapprox(cv3_total, cv_TEP_total, atol = 1e-4)
         @warn "Sum of modal heat capacities ($(cv3_total)) does not match heat capacity from total TEP energy ($(cv_TEP_total))"
@@ -75,7 +76,7 @@ function NM_postprocess(energies_path::String, tep_path::String,
     #Save heat capacity data
     jldsave(joinpath(energies_path, "cv_data.jld2"), 
         cv_total_MD = cv_total_MD, cv3_total = cv3_total,
-        cv3_per_mode = cv3_per_mode, cv3_cov = cv3_cov)
+        cv3_per_mode = cv3_per_mode, cv3_avg_freq = cv3_avg_freq, cv3_cov = cv3_cov)
 
 end
 
