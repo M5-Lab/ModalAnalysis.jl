@@ -67,7 +67,6 @@ function NM_postprocess(energies_path::String, tep_path::String,
     scatter!(freqs, vec(cv3_per_mode));
     save(joinpath(energies_path,"heat_cap_per_mode.svg"), f)
 
-    @info "HERE"
     #Sanity check
     if !isapprox(cv3_total, cv_TEP_total, atol = 1e-4)
         @warn "Sum of modal heat capacities ($(cv3_total)) does not match heat capacity from total TEP energy ($(cv_TEP_total))"
