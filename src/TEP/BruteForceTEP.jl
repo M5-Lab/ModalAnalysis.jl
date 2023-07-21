@@ -1,22 +1,36 @@
-"""
-Energy of second order part of TEP
-"""
-function U_TEP2(F2, u)    
-    @tensor begin
-        U2 = F2[i,j]*u[i]*u[j]
+
+
+function U_TEP_bf(F2, F3, u)    
+    #Calculate potential energy
+    U2 = 0.5*((transpose(u) * F2) * u) # ~560 μs with 256 atoms
+    U3 = zero(U2)
+
+    @turbo for k in eachindex(u)
+        for j in eachindex(u)
+            for i in eachindex(u)
+                U3 += F3[i, j, k] * (u[i]*u[j]*u[k])
+            end
+        end
     end
-    return U2/2
+
+
+    return U2 + U3/6
 end
 
-"""
-Energy of third order part of TEP
-"""
-function U_TEP3(F3, u)
-    @tensor begin
-        U3 = F3[i,j,k]*u[i]*u[j]*u[k]
+function U_TEP3_bf(F3,u)
+
+    U3 = 0.0
+
+    @turbo for j in eachindex(u)
+        for i in eachindex(u)
+            for k in eachindex(u)
+                U3 += F3[i, j, k] * (u[i]*u[j]*u[k])
+            end
+        end
     end
     return U3/6
 end
+
 
 """
 Energy of element n in third order part of TEP
@@ -29,4 +43,3 @@ function U_TEP3_n(F3, u, n)
     end
     return U3/6
 end
-
