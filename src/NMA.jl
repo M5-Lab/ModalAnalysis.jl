@@ -64,7 +64,7 @@ function NMA_loop(eq::LammpsDump, ld::LammpsDump,
     initial_positions = Matrix(eq.data_storage[!, ["x","y","z"]])
 
     #Pre-allocate
-    mode_potential_order3 = zeros(N_modes, ld.n_samples) #TODO: might not work well for larger datasets but H5 is slow at small writes
+    mode_potential_order3 = zeros(N_modes, ld.n_samples) #TODO: allocating might not work well for big data but H5 is slow at small writes
     total_eng_NM = zeros(ld.n_samples)
 
     @showprogress 10 "NMA Loop" for i in 1:ld.n_samples

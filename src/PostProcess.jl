@@ -28,6 +28,8 @@ function NM_postprocess(energies_path::String, tep_path::String,
     Legend(f[1,2], [s1,s2], ["MD", "TEP"], "Energy Calculator")
     save(joinpath(energies_path,"pot_eng_hist.svg"), f)
 
+    #TODO: CHECK IF COL MAJOR ACCESS SPEEDS THINGS UP
+
     #Write per-mode data to file
     cv3_cov = zeros(N_modes, N_modes)
     Threads.@threads for thread_id in 1:nthreads
