@@ -1,14 +1,16 @@
 export NM_postprocess
 
 function NM_postprocess(energies_path::String, tep_path::String, 
-        kB, T, N_modes; nthreads::Integer = Threads.nthreads(), average_identical_freqs = true)
+        kB, T; nthreads::Integer = Threads.nthreads(), average_identical_freqs = true)
 
     NMA_filepath = joinpath(energies_path, "ModeEnergies.jld2")
     TEP_filepath = joinpath(tep_path, "TEP.jld2")
 
     potential_eng_MD, potential_eng_TEP, mode_potential_order3 =
         load(NMA_filepath, "potential_eng_MD", "total_eng_NM", "mode_potential_order3")
-    freqs_sq, phi = load(TEP_filepath, "freqs_sq", "phi")
+    freqs_sq = load(TEP_filepath, "freqs_sq")
+
+    N_modes = length(freqs_sq)
 
     if any(freqs_sq .< 0.0)
         freqs = imag_to_neg(sqrt.(Complex.(freqs_sq)))
@@ -44,6 +46,7 @@ function NM_postprocess(energies_path::String, tep_path::String,
             end
         end
     end
+
     cv3_per_mode = sum(cv3_cov, dims = 2);
     cv3_total = sum(cv3_per_mode)
 
@@ -76,14 +79,14 @@ function NM_postprocess(energies_path::String, tep_path::String,
 
     #Save heat capacity data
     jldsave(joinpath(energies_path, "cv_data.jld2"), 
-        cv_total_MD = cv_total_MD, cv3_total = cv3_total,
-        cv3_per_mode = cv3_per_mode, cv3_avg_freq = cv3_avg_freq, cv3_cov = cv3_cov)
+        cv_total_MD = cv_total_MD, cv_total_MD_norm = cv_total_MD/(N_modes*kB),
+        cv3_total = cv3_total, cv3_total_norm = cv3_total/(N_modes*kB),
+        cv3_per_mode = cv3_per_mode, cv3_per_mode_norm = cv3_per_mode./(N_modes*kB),
+        cv3_avg_freq = cv3_avg_freq, cv3_avg_freq_norm = cv3_avg_freq./(N_modes*kB),
+        cv3_cov = cv3_cov)
 
 end
 
-function average_seeds()
-
-end
 
 function imag_to_neg(freqs)
     freqs_float = zeros(size(freqs))

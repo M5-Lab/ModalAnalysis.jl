@@ -17,7 +17,8 @@ using DelimitedFiles
 # NMA EXAMPLE #
 ###############
 # base_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_4UC\NMA"
-base_path = raw"C:\Users\ejmei\Desktop\seed4"
+# base_path = raw"C:\Users\ejmei\Desktop\seed4"
+base_path = raw"C:\Users\ejmei\Desktop\PLS"
 equilibrium_data_path = joinpath(base_path, "equilibrium.atom")
 dump_path = joinpath(base_path, "dump.atom")
 thermo_path = joinpath(base_path,"thermo_data.txt")
@@ -47,7 +48,7 @@ gpu_id = 0
 TEP_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_4UC\TEP.jld2"
 kB = ustrip(u"kcal * mol^-1 * K^-1", Unitful.k*Unitful.Na)
 NMA(eq, ld, potential_eng_MD, atom_masses, out_path,  TEP_path, gpu_id)
-NM_postprocess(base_path, dirname(TEP_path), kB, T_avg, 3*length(atom_masses); average_identical_freqs = true)
+NM_postprocess(base_path, dirname(TEP_path), kB, T_avg; average_identical_freqs = true)
 # ProfileView.@profview
 
 ###############

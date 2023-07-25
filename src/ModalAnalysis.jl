@@ -7,7 +7,7 @@ using LoopVectorization
 using JLD2
 using StatsBase
 using ProgressMeter
-import CUDA
+import CUDA, cuTENSOR
 
 #TODO: register online
 using ForceConstants
@@ -17,7 +17,7 @@ module TEP
     using TensorOperations
     using ForceConstants
     using LoopVectorization
-    using CUDA
+    using CUDA, cuTENSOR
 
     include("./TEP/TEP.jl")
 end

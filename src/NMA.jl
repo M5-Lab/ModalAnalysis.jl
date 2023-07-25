@@ -81,11 +81,10 @@ function NMA_loop(eq::LammpsDump, ld::LammpsDump,
         copyto!(cuQ, q_anharmonic)
 
         #Calculate energy from INMs at timestep i
-        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q_anharmonic.^2)) .+ U_TEP3_n_CUDA(cuK3, cuQ, q_anharmonic, N_modes)
-        total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + potential_eng_MD[firstindex(potential_eng_MD)]          
+        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q_anharmonic.^2)) .+ U_TEP3_n_CUDA(cuK3, cuQ)
+        total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + potential_eng_MD[1]          
 
     end
-
 
     jldopen(joinpath(out_basepath, "ModeEnergies.jld2"), "w") do file
         file["mode_potential_order3"] = mode_potential_order3
