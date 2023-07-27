@@ -24,7 +24,7 @@ end
         u = rand(Float32, 3)
         
         cpu = U_TEP3_n_CPU(K3, u)
-        gpu = U_TEP3_n_CUDA(CuArray(K3), CuArray(u), u::AbstractVector, 3)
+        gpu = U_TEP3_n_CUDA(CuArray(K3), CuArray(u), u, 3)
 
         @test isapprox(cpu, gpu, atol = 1e-7)
 
