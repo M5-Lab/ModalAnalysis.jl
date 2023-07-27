@@ -21,13 +21,15 @@ function NMA(eq::LammpsDump, ld::LammpsDump, pair_potential::Potential, potentia
     sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "x", "y", "z")
 
     # Initialize NMs to 3rd Order
-    freqs_sq, phi, K3 = get_modal_data(sys, pair_potential; gpu_device_id = gpu_device_id)
+    freqs_sq, phi, dynmat, F3, K3 = get_modal_data(sys, pair_potential; gpu_device_id = gpu_device_id)
     
     #Save mode data
     jldopen(joinpath(out_basepath, "TEP.jld2"), "w") do file
         file["freqs_sq"] = freqs_sq
         file["phi"] = phi
+        file["F3"] = F3.values
         file["K3"] = K3
+        file["dynmat"] = dynmat.values
     end
 
     NMA_loop(eq, ld, potential_eng_MD, atom_masses, out_basepath, freqs_sq, phi, K3)
@@ -38,12 +40,14 @@ function NMA(eq::LammpsDump, ld::LammpsDump, potential_eng_MD,
      atom_masses, out_basepath::String, TEP_path::String, gpu_device_id::Int)
 
     # Load data
+    # freqs_sq, phi, dynmat, K3 = load(TEP_path, "freqs_sq", "phi", "dynmat", "K3")
     freqs_sq, phi, K3 = load(TEP_path, "freqs_sq", "phi", "K3")
 
     #Always save a copy of freqs and phi for post processing stuff
     jldopen(joinpath(out_basepath, "TEP.jld2"), "w") do file
         file["freqs_sq"] = freqs_sq
         file["phi"] = phi
+        # file["dynmat"] = dynmat
     end
     
     NMA_loop(eq, ld, potential_eng_MD, atom_masses, out_basepath, freqs_sq, phi, K3)
@@ -54,14 +58,16 @@ function NMA_loop(eq::LammpsDump, ld::LammpsDump,
      potential_eng_MD, atom_masses, out_basepath, freqs_sq, phi, K3)
 
     N_modes = length(freqs_sq)
-
+    mass_sqrt = sqrt.(atom_masses)
 
     K3 = Float32.(K3)
     cuK3 = CUDA.CuArray(K3)
     cuQ = CUDA.zeros(N_modes)
 
     dump_file = open(ld.path, "r")
+    # initial_positions = Matrix(eq.data_storage[!, ["xu","yu","zu"]])
     initial_positions = Matrix(eq.data_storage[!, ["x","y","z"]])
+
 
     #Pre-allocate
     mode_potential_order3 = zeros(N_modes, ld.n_samples) #TODO: allocating might not work well for big data but H5 is slow at small writes
@@ -73,15 +79,15 @@ function NMA_loop(eq::LammpsDump, ld::LammpsDump,
         
         #Calculate displacements
         disp = Matrix(ld.data_storage[!, ["xu","yu","zu"]]) .- initial_positions
-        for col in eachcol(disp) col .*= sqrt.(atom_masses) end
+        disp .*= mass_sqrt 
         disp_mw = reduce(vcat, eachrow(disp)) #TODO: should it be [xxxxxyyyyyzzz] or [xyzxyzxyz]??
 
         #Convert displacements to mode amplitudes.
-        q_anharmonic = phi' * disp_mw;
-        copyto!(cuQ, q_anharmonic)
+        q = phi' * disp_mw; #TODO: does phi get written col major??
+        copyto!(cuQ, q)
 
         #Calculate energy from INMs at timestep i
-        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q_anharmonic.^2)) .+ U_TEP3_n_CUDA(cuK3, cuQ)
+        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ U_TEP3_n_CUDA(cuK3, cuQ)
         total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + potential_eng_MD[1]          
 
     end

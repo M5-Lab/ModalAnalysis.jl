@@ -1,4 +1,4 @@
-
+export U_TEP3_bf, U_TEP_bf, U_TEP3_n_bf
 
 function U_TEP_bf(F2, F3, u)    
     #Calculate potential energy
@@ -35,7 +35,7 @@ end
 """
 Energy of element n in third order part of TEP
 """
-function U_TEP3_n(F3, u, n)
+function U_TEP3_n_bf(F3, u, n)
     F3_view = view(F3, n, :, :)
     u_n = u[n]
     @tensor begin

@@ -20,6 +20,7 @@ module TEP
     using CUDA, cuTENSOR
 
     include("./TEP/TEP.jl")
+    include("./TEP/BruteForceTEP.jl")
 end
 using .TEP
 
@@ -29,7 +30,5 @@ include("INMA.jl")
 include("NMA.jl")
 include("PostProcess.jl")
 # include("WorkSplittingStrategies.jl")
-
-
 
 end

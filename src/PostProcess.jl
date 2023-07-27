@@ -25,8 +25,9 @@ function NM_postprocess(energies_path::String, tep_path::String,
 
     #Save system level energy histograms
     f = Figure()
-    ax = Axis(f[1,1], xlabel = "Potential Energy", ylabel = "Count")
-    s1 = stephist!(potential_eng_MD); s2 = stephist!(potential_eng_TEP)
+    ax = Axis(f[1,1], xlabel = "Potential Energy", ylabel = "PDF")
+    s1 = stephist!(potential_eng_MD, normalization = :pdf)
+    s2 = stephist!(potential_eng_TEP, normalization = :pdf)
     Legend(f[1,2], [s1,s2], ["MD", "TEP"], "Energy Calculator")
     save(joinpath(energies_path,"pot_eng_hist.svg"), f)
 
@@ -61,7 +62,7 @@ function NM_postprocess(energies_path::String, tep_path::String,
         f = Figure()
         Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\text{Mode Heat Capacity / }k_{\text{B}}",
             title = "Heat Capacity per Mode Avg by Freq: T = $(round(T,sigdigits = 4))")
-        scatter!(unique_freqs, vec(cv3_avg_freq));
+        scatter!(unique_freqs, vec(cv3_avg_freq)./kB);
         save(joinpath(energies_path,"heat_cap_per_mode_avg_freq.svg"), f)
     end
 
@@ -69,7 +70,7 @@ function NM_postprocess(energies_path::String, tep_path::String,
     f = Figure()
     ax = Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\text{Mode Heat Capacity / }k_{\text{B}}",
         title = "Heat Capacity per Mode: T = $T")
-    scatter!(freqs, vec(cv3_per_mode));
+    scatter!(freqs, vec(cv3_per_mode)./kB);
     save(joinpath(energies_path,"heat_cap_per_mode.svg"), f)
 
     #Sanity check
