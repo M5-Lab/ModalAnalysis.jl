@@ -1,64 +1,120 @@
+export NormalModeAnalysis, InstantaneousNormalModeAnalysis
+
 """
-This file includes functions common to both Instantaneous Normal Mode Analysis (INMA.jl) 
-and Normal Mode Analysis (NMA.jl).
+ModalAnalysis.jl expects the following file structure for a 
+`NormalModeAnalysis` or `InstantaneousNormalModeAnalysis`.
+    └── <simulation_folder>
+            ├── dump.atom
+            ├── equilibrium.atom
+            ├── thermo_data.txt
 """
+abstract type ModalAnalysisAlgorithm end
 
-# abstract type WorkSplittingStrategy end
-# struct SplitByParameter <: WorkSplittingStrategy end # 1 dump file per GPU
-# struct SplitByData <: WorkSplittingStrategy end # Multiple GPU per dump file
+#TODO: Move to conf file
+const global TEMPERATURE_COL = 2
+const global POTENTIAL_ENG_COL = 3
+const global FC_TOL = 1e-12
 
-# abstract type ModalAnalysisAlgorithm end
-# struct NormalModeAnalysis{M} <: ModalAnalysisAlgorithm 
-#     dump_file_paths::Vector{String}
-#     thermo_data_file_paths::Vector{String}
-#     potential::Potential
-#     masses::Vector{M}
-# end
+struct NormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm 
+    simulation_folder::String
+    potential::Potential
+    temperature::T
+    atom_masses::Vector{M}
+    pot_eng_MD::Vector{Float64}
+    eq::LammpsDump
+    ld::LammpsDump
+    sys::SuperCellSystem
+end
 
-# function NormalModeAnalysis(dump_file_paths, thermo_data_file_paths)
+function NormalModeAnalysis(simulation_folder, pot, temperature)
+    atom_masses, pot_eng_MD, T_avg, eq, ld = parse_simulation_data(simulation_folder)
+    check_temp(nma, T_avg)
+
+    box_sizes = [ld.header_data["L_x"][2], ld.header_data["L_y"][2], ld.header_data["L_z"][2]]
+    sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "xu", "yu", "zu")
+
+    return NormalModeAnalysis{typeof(temperature), eltype(atom_masses)}(
+        simulation_folder, pot, temperature, atom_masses, pot_eng_MD, eq, ld, sys)
+end
+
+struct InstantaneousNormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm
+    simulation_folder::String
+    potential::Potential
+    temperature::T
+    atom_masses::Vector{M}
+    pot_eng_MD::Vector{Float64}
+    eq::LammpsDump
+    ld::LammpsDump
+    sys::SuperCellSystem
+end
+
+function InstantaneousNormalModeAnalysis(simulation_folder, pot, temperature)
+    atom_masses, pot_eng_MD, T_avg, eq, ld = parse_simulation_data(simulation_folder)
+    check_temp(temperature, T_avg)
+
+    box_sizes = [ld.header_data["L_x"][2], ld.header_data["L_y"][2], ld.header_data["L_z"][2]]
+    sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "xu", "yu", "zu")
+
+    return InstantaneousNormalModeAnalysis{typeof(temperature), eltype(atom_masses)}(
+        simulation_folder, pot, temperature, atom_masses, pot_eng_MD, eq, ld, sys)
+end
 
 
-# end
+function parse_simulation_data(path::String)
 
-# struct InstantaneousNormalModeAnalysis{M} <: ModalAnalysisAlgorithm
-#     dump_file_paths::Vector{String}
-#     thermo_data_file_paths::Vector{String}
-#     potential::Potential
-#     masses::Vector{M}
-# end
+    equilibrium_data_path = joinpath(path, "equilibrium.atom")
+    dump_path = joinpath(path, "dump.atom")
+    thermo_path = joinpath(path,"thermo_data.txt")
 
-# function InstantaneousNormalModeAnalysis(dump_file_paths, thermo_data_file_paths)
+    eq = LammpsDump(equilibrium_data_path);
+    parse_timestep!(eq, 1)
+    atom_masses = get_col(eq, "mass")
 
+    ld = LammpsDump(dump_path);
 
-# end
+    #Load Thermo Data & Masses
+    thermo_data = readdlm(thermo_path, skipstart = 2);
+    potential_eng_MD = thermo_data[:,POTENTIAL_ENG_COL]
+    temps_MD = thermo_data[:, TEMPERATURE_COL]
 
+    T_avg = mean(temps_MD)
+
+    return atom_masses, potential_eng_MD, T_avg, eq, ld
+
+end
+
+function check_temp(T, T_actual::Float64)
+    if !isapprox(T, T_actual, atol = 1e-2)
+        @warn "ModalAnalysisAlgorithm expected temperature: $(T) but MD simulation average was $(T_actual)"
+    end
+end
 
 # This function is bottle neck, specifically F3_2_K3
-function get_modal_data(sys, potential; gpu_device_id::Integer = 0, tol = 1e-12)
-    dynmat = dynamicalMatrix(sys, potential, tol)
+function get_modal_data(ma::ModalAnalysisAlgorithm)
+    dynmat = dynamicalMatrix(ma.sys, ma.potential, FC_TOL)
     freqs_sq, phi = get_modes(dynmat)
 
-    Ψ = third_order_IFC(sys, potential, tol);
+    Ψ = third_order_IFC(ma.sys, ma.potential, FC_TOL);
     @info "IFC3 calculation complete"
     Ψ = mass_weight_third_order!(Ψ, masses(sys))
 
     cuΨ = CuArray(Ψ.values); cuPhi = CuArray(Float32.(phi))
-    K3 = mcc3(cuΨ, cuPhi, tol = tol, gpu_id = gpu_device_id);
+    K3 = mcc3(cuΨ, cuPhi, tol = FC_TOL);
 
     @info "MCC3 calculation complete"
     return freqs_sq, phi, dynmat, Ψ, K3
 end
 
-function get_modal_data(sys, potential, mcc_block_size::Integer; gpu_device_id::Integer = 0, tol = 1e-12)
-    dynmat = dynamicalMatrix(sys, potential, tol)
+function get_modal_data(ma::ModalAnalysisAlgorithm, mcc_block_size::Integer)
+    dynmat = dynamicalMatrix(ma.sys, ma.potential, FC_TOL)
     freqs_sq, phi = get_modes(dynmat)
 
-    Ψ = third_order_IFC(sys, potential, tol);
+    Ψ = third_order_IFC(ma.sys, ma.potential, FC_TOL);
     @info "IFC3 calculation complete"
     Ψ = mass_weight_third_order!(Ψ, masses(sys))
 
     cuΨ = CuArray{Float32}(Ψ.values); cuPhi = CuArray{Float32}(phi)
-    K3 = mcc3(cuΨ, cuPhi, mcc_block_size, tol = tol, gpu_id = gpu_device_id);
+    K3 = mcc3(cuΨ, cuPhi, mcc_block_size, tol = FC_TOL);
 
     @info "MCC3 calculation complete"
     return freqs_sq, phi, dynmat, Ψ, K3
