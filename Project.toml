@@ -21,3 +21,5 @@ cuTENSOR = "011b41b2-24ef-40a8-b3eb-fa098493e9e1"
 
 [compat]
 julia = "1.8"
+JLD2 = "0.4.33"
+TensorOperations = "4.0.0"
