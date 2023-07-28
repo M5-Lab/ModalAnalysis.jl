@@ -1,4 +1,4 @@
-export NM_postprocess
+export NM_postprocess, NMA_avg_seeds
 
 function NM_postprocess(energies_path::String, tep_path::String, 
         kB, T; nthreads::Integer = Threads.nthreads(), average_identical_freqs = true)
@@ -116,7 +116,7 @@ function NMA_avg_seeds(basepath, n_seeds; seed_subfolder::String = "seed", seeds
 
     freqs_sq = load(joinpath(basepath, "TEP.jld2"), "freqs_sq")
     freqs = sqrt.(freqs_sq)
-    freqs = round.(freqs, sigdigits = 5)
+    freqs = round.(freqs, sigdigits = 5) #TODO: read from save file
     freqs_unique = unique(freqs)
     
     MD_cv_total = []

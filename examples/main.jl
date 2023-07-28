@@ -9,11 +9,19 @@ using Unitful
 using ForceConstants
 using StatsBase
 using DelimitedFiles
-import CUDA: devices
+import CUDA
 
 #TODO: get it to handle units
 #TODO: write data in another CPU thread??
 
+function balanced_partition(arr, n)
+    len = length(arr)
+    size = len ÷ n
+    remainder = len % n
+    starts = [1 + ((i-1) * size) + min(i-1, remainder) for i in 1:n]
+    ends = [i * size + min(i, remainder) for i in 1:n]
+    [arr[starts[i]:ends[i]] for i in 1:n]
+end
 
 pot = LJ(3.4, 0.24037, 8.5);
 base_path = "/home/emeitz/MD_data/NMA_LJ_FCC_4UC/"
@@ -21,22 +29,23 @@ base_path = "/home/emeitz/MD_data/NMA_LJ_FCC_4UC/"
 TEP_path = raw"/home/emeitz/MD_data/NMA_LJ_FCC_4UC/TEP.jld2"
 kB = ustrip(u"kcal * mol^-1 * K^-1", Unitful.k*Unitful.Na)
 
-temps = [40,50,60,70,80]
+temps = [40,50,60,70,80] #already ran 10-30
 n_seeds = 10
 
 total_threads = Threads.nthreads()
-gpu_ids = devices()
+gpu_ids = CUDA.devices()
 threads_per_task = div(total_threads, length(gpu_ids))
 
 param_combos = Iterators.product(temps, 1:n_seeds)
-gpu_jobs = Iterators.partition(param_combos, length(gpu_ids))
+gpu_jobs = balanced_partition(collect(param_combos), length(gpu_ids))
+
+@assert length(gpu_jobs) == length(gpu_ids)
 
 
 @sync for (gpu_id, gpu_job) in enumerate(gpu_jobs)
-
     # New CPU Thread for Each GPU
     Threads.@spawn begin
-        
+        CUDA.device!(gpu_id)
         #Launch GPU Jobs in Serial
         for param_combo in gpu_job
             temp, seed = param_combo
@@ -74,7 +83,7 @@ MD_cv_arr = zeros(length(temps))
 MD_std_err_arr = zeros(length(temps))
 TEP_cv_arr = zeros(length(temps))
 TEP_std_err_arr = zeros(length(temps))
-Threads.@threads for (i,temp) in enumerate(temps)
+Threads.@threads for (i,temp) in collect(enumerate(temps))
     MD_cv_total_avg, MD_cv_std_err, TEP_cv_total_avg, TEP_cv_std_err = NMA_avg_seeds(path, n_seeds)
     TEP_cv_arr[i] = TEP_cv_total_avg
     TEP_std_arr[i] = TEP_cv_std
