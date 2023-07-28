@@ -1,4 +1,4 @@
-export U_TEP3_n_CPU, U_TEP3_n_CUDA
+export U_TEP3_n_CPU, U_TEP3_n_CUDA, U_TEP3_CUDA
 
 function U_TEP3_n_CPU(F3::Array{T,3}, u) where T
     @tensor begin
@@ -13,4 +13,11 @@ function U_TEP3_n_CUDA(cuF3::CuArray{Float32,3}, cu_u::CuArray{Float32,1})
         per_mode[n] := cuF3[i,j,n] * cu_u[i] * cu_u[j]
     end
     return Array((per_mode .* cu_u)./6)
+end
+
+function U_TEP3_CUDA(cuF3::CuArray{Float32,3}, cu_u::CuArray{Float32,1})
+    @tensor begin
+        U = cuF3[i,j,k] * cu_u[i] * cu_u[j] * cu_u[k]
+    end
+    return U/6
 end

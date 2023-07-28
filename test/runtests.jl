@@ -29,10 +29,13 @@ end
         @test isapprox(cpu, gpu, atol = 1e-7)
 
         brute_force = U_TEP3_bf(K3, u)
+        total_gpu = U_TEP3_CUDA(K3, u)
 
+        @test isapprox(brute_force, total_gpu)
         @test isapprox(sum(cpu), brute_force)
 
         bf = U_TEP3_n_bf(K3, u, 2)
+        
         @test isapprox(bf, cpu)
     end
 end

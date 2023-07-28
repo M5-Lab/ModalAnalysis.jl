@@ -7,7 +7,7 @@ using LoopVectorization
 using JLD2
 using StatsBase
 using ProgressMeter
-import CUDA, cuTENSOR
+using CUDA, cuTENSOR
 
 #TODO: register online
 using ForceConstants

@@ -34,16 +34,32 @@ and Normal Mode Analysis (NMA.jl).
 
 
 # This function is bottle neck, specifically F3_2_K3
-function get_modal_data(sys, potential; gpu_device_id = 0, tol = 1e-12)
+function get_modal_data(sys, potential; gpu_device_id::Integer = 0, tol = 1e-12)
     dynmat = dynamicalMatrix(sys, potential, tol)
     freqs_sq, phi = get_modes(dynmat)
 
     Ψ = third_order_IFC(sys, potential, tol);
     @info "IFC3 calculation complete"
-    Ψ_sparse_mw = mass_weight_sparsify_third_order(Ψ, masses(sys))
-    # println(length(Ψ_sparse_mw.values))
-    # println(size(phi))
-    @time K3 = to_mcc(Ψ_sparse_mw, phi, tol, gpu_device_id);
+    Ψ = mass_weight_third_order!(Ψ, masses(sys))
+
+    cuΨ = CuArray(Ψ.values); cuPhi = CuArray(Float32.(phi))
+    K3 = mcc3(cuΨ, cuPhi, tol = tol, gpu_id = gpu_device_id);
+
+    @info "MCC3 calculation complete"
+    return freqs_sq, phi, dynmat, Ψ, K3
+end
+
+function get_modal_data(sys, potential, mcc_block_size::Integer; gpu_device_id::Integer = 0, tol = 1e-12)
+    dynmat = dynamicalMatrix(sys, potential, tol)
+    freqs_sq, phi = get_modes(dynmat)
+
+    Ψ = third_order_IFC(sys, potential, tol);
+    @info "IFC3 calculation complete"
+    Ψ = mass_weight_third_order!(Ψ, masses(sys))
+
+    cuΨ = CuArray{Float32}(Ψ.values); cuPhi = CuArray{Float32}(phi)
+    K3 = mcc3(cuΨ, cuPhi, mcc_block_size, tol = tol, gpu_id = gpu_device_id);
+
     @info "MCC3 calculation complete"
     return freqs_sq, phi, dynmat, Ψ, K3
 end
