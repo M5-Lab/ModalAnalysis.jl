@@ -142,9 +142,11 @@ function NMA_avg_seeds(basepath, n_seeds; seed_subfolder::String = "seed", seeds
     f = Figure()
     ax = Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\text{Mode Heat Capacity / }k_{\text{B}}",
         title = "$(temp)K", yticks = [0.0,0.25,0.5])
-    scatter!(freqs_unique, 768 .*vec(TEP_cv_avg_by_freq_avg[:,i])); #TODO FIRST RUN WAS MESSED UP RM 768 LATER
+    scatter!(freqs_unique, vec(TEP_cv_avg_by_freq_avg[:,i]));
     ylims!(ax, (-0.05, 0.55))
     save(joinpath(basepath, "freqs_unique_$(temp)K.svg"), f)
+
+    return MD_cv_total_avg, TEP_cv_total_avg
     
 end
 

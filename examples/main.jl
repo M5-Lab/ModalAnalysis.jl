@@ -17,10 +17,11 @@ import CUDA: devices
 
 pot = LJ(3.4, 0.24037, 8.5);
 base_path = "/home/emeitz/MD_data/NMA_LJ_FCC_4UC/"
-TEP_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_4UC\TEP.jld2"
+# TEP_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_4UC\TEP.jld2"
+TEP_path = raw"/home/emeitz/MD_data/NMA_LJ_FCC_4UC/TEP.jld2"
 kB = ustrip(u"kcal * mol^-1 * K^-1", Unitful.k*Unitful.Na)
 
-temps = [10,20,30,40,50,60,70,80]
+temps = [40,50,60,70,80]
 n_seeds = 10
 
 total_threads = Threads.nthreads()
@@ -41,7 +42,7 @@ gpu_jobs = Iterators.partition(param_combos, length(gpu_ids))
             temp, seed = param_combo
 
             @info "Starting temperature $(temp), seed $(seed) on GPU $(gpu_id)"
-            seed_path = joinpath(base_path,"$(temp)K/seed$(i-1)")
+            seed_path = joinpath(base_path,"$(temp)K/seed$(seed-1)")
 
             equilibrium_data_path = joinpath(seed_path, "equilibrium.atom")
             dump_path = joinpath(seed_path, "dump.atom")
@@ -67,6 +68,8 @@ gpu_jobs = Iterators.partition(param_combos, length(gpu_ids))
         end
     end
 end
+
+temps = [10,20,30,40,50,60,70,80]
 
 @sync for temp in temps
     Threads.@spawn begin
