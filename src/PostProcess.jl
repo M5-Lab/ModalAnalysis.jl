@@ -119,23 +119,25 @@ function NMA_avg_seeds(basepath, n_seeds; seed_subfolder::String = "seed", seeds
     freqs = round.(freqs, sigdigits = 5)
     freqs_unique = unique(freqs)
     
-    MD_cv_total_avg = 0.0
-    TEP_cv_total_avg = 0.0
+    MD_cv_total = []
+    TEP_cv_total = []
     TEP_cv_avg_by_freq_avg = zeros(length(freqs_unique)) #avgerage, averaged over seeds since they all have same freqs
     
     for seed in 1:n_seeds
         seed_path = joinpath(basepath,"$(seed_subfolder)$(seed-seeds_zero_indexed)/cv_data.jld2")
         cv_total_MD_norm, cv3_total_norm, cv3_avg_freq_norm = load(seed_path, "cv_total_MD_norm", "cv3_total_norm", "cv3_avg_freq_norm")
 
-        MD_cv_total_avg += cv_total_MD_norm
-        TEP_cv_total_avg += cv3_total_norm
+        push!(MD_cv_total, cv_total_MD_norm)
+        push!(TEP_cv_total, cv3_total_norm)
         
         TEP_cv_avg_by_freq_avg .+= cv3_avg_freq_norm
 
     end
     
-    MD_cv_total_avg /= n_seeds
-    TEP_cv_total_avg /= n_seeds
+    MD_cv_total_avg = mean(MD_cv_total)
+    MD_cv_std_err = std(MD_cv_total)/sqrt(length(MD_cv_total))
+    TEP_cv_total_avg = mean(TEP_cv_total)
+    TEP_cv_std_err = std(TEP_cv_total)/sqrt(length(MD_cv_total))
     TEP_cv_avg_by_freq_avg ./= n_seeds
     
 
@@ -146,7 +148,7 @@ function NMA_avg_seeds(basepath, n_seeds; seed_subfolder::String = "seed", seeds
     ylims!(ax, (-0.05, 0.55))
     save(joinpath(basepath, "freqs_unique_$(temp)K.svg"), f)
 
-    return MD_cv_total_avg, TEP_cv_total_avg
+    return MD_cv_total_avg, MD_cv_std_err, TEP_cv_total_avg, TEP_cv_std_err
     
 end
 

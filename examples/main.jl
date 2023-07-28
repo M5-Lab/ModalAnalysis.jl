@@ -70,15 +70,27 @@ gpu_jobs = Iterators.partition(param_combos, length(gpu_ids))
 end
 
 temps = [10,20,30,40,50,60,70,80]
-
-@sync for temp in temps
-    Threads.@spawn begin
-        for seed in 1:n_seeds
-            path = joinpath(base_path,"$(temp)K/")
-            NMA_avg_seeds(path, n_seeds)
-        end
-    end
+MD_cv_arr = zeros(length(temps))
+MD_std_err_arr = zeros(length(temps))
+TEP_cv_arr = zeros(length(temps))
+TEP_std_err_arr = zeros(length(temps))
+Threads.@threads for (i,temp) in enumerate(temps)
+    MD_cv_total_avg, MD_cv_std_err, TEP_cv_total_avg, TEP_cv_std_err = NMA_avg_seeds(path, n_seeds)
+    TEP_cv_arr[i] = TEP_cv_total_avg
+    TEP_std_arr[i] = TEP_cv_std
+    MD_cv_arr[i] = MD_cv_total_avg
+    MD_std_arr[i] = MD_cv_std
 end
+
+f = Figure()
+ax = Axis(f[1,1], xlabel = "Temperature [K]", ylabel = "Total Heat Capacity")
+s1 = scatter!(temps_to_parse, MD_cv_arr)
+s2 = scatter!(temps_to_parse, TEP_cv_arr)
+errorbars!(temps_to_parse, MD_cv_arr, MD_std_err_arr, MD_std_err_arr, whiskerwidth = 3, direction = :y)
+errorbars!(temps_to_parse, TEP_cv_arr, TEP_std_err_arr, TEP_std_err_arr, whiskerwidth = 3, direction = :y)
+Legend(f[1,2], [s1,s2], ["MD", "TEP"], "Energy Calculator")
+save(joinpath(basepath,"HeatCap_vs_Temp.svg"), f)
+
 
 
 ###############
