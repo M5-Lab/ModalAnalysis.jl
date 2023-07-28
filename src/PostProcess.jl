@@ -124,7 +124,7 @@ function NMA_avg_seeds(basepath, n_seeds; seed_subfolder::string = "seed", seeds
     TEP_cv_avg_by_freq_avg = zeros(length(freqs_unique)) #avgerage, averaged over seeds since they all have same freqs
     
     for seed in 1:n_seeds
-        seed_path = joinpath(basepath."$(seed_subfolder)$(seed-seeds_zero_indexed)/cv_data.jld2")
+        seed_path = joinpath(basepath,"$(seed_subfolder)$(seed-seeds_zero_indexed)/cv_data.jld2")
         cv_total_MD_norm, cv3_total_norm, cv3_avg_freq_norm = load(seed_path, "cv_total_MD_norm", "cv3_total_norm", "cv3_avg_freq_norm")
 
         MD_cv_total_avg += cv_total_MD_norm
