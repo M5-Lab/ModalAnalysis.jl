@@ -84,7 +84,8 @@ MD_std_err_arr = zeros(length(temps))
 TEP_cv_arr = zeros(length(temps))
 TEP_std_err_arr = zeros(length(temps))
 Threads.@threads for (i,temp) in collect(enumerate(temps))
-    MD_cv_total_avg, MD_cv_std_err, TEP_cv_total_avg, TEP_cv_std_err = NMA_avg_seeds(path, n_seeds)
+    temp_path = joinpath(base_path,"$(temp)K")
+    MD_cv_total_avg, MD_cv_std_err, TEP_cv_total_avg, TEP_cv_std_err = NMA_avg_seeds(temp_path, n_seeds)
     TEP_cv_arr[i] = TEP_cv_total_avg
     TEP_std_arr[i] = TEP_cv_std
     MD_cv_arr[i] = MD_cv_total_avg
