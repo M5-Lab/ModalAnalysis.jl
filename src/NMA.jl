@@ -68,7 +68,11 @@ function NMA(eq::LammpsDump, ld::LammpsDump, potential_eng_MD,
 
     # Load data
     # freqs_sq, phi, dynmat, K3 = load(TEP_path, "freqs_sq", "phi", "dynmat", "K3")
-    freqs_sq, phi, K3 = load(TEP_path, "freqs_sq", "phi", "K3")
+    jldopen(TEP_path, "r"; parallel_read = true) do f
+        freqs_sq = f["freqs_sq"]
+        phi = f["phi"]
+        K3 = f["K3"]
+    end
 
     #Always save a copy of freqs and phi for post processing stuff
     jldopen(joinpath(out_basepath, "TEP.jld2"), "w") do file
