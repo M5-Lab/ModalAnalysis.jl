@@ -107,10 +107,10 @@ function NMA_loop(eq::LammpsDump, ld::LammpsDump,
         #Calculate displacements
         disp = Matrix(ld.data_storage[!, ["xu","yu","zu"]]) .- initial_positions
         disp .*= mass_sqrt 
-        disp_mw = reduce(vcat, eachrow(disp)) #TODO: should it be [xxxxxyyyyyzzz] or [xyzxyzxyz]??
+        disp_mw = reduce(vcat, eachrow(disp))
 
         #Convert displacements to mode amplitudes.
-        q = phi' * disp_mw; #TODO: does phi get written col major??
+        q = phi' * disp_mw;
         copyto!(cuQ, q)
 
         #Calculate energy from INMs at timestep i
