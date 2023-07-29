@@ -11,9 +11,12 @@ ModalAnalysis.jl expects the following file structure for a
 abstract type ModalAnalysisAlgorithm end
 
 #TODO: Move to conf file
-const global TEMPERATURE_COL = 2
-const global POTENTIAL_ENG_COL = 3
-const global FC_TOL = 1e-12
+const global TEMPERATURE_COL::Int64 = 2
+const global POTENTIAL_ENG_COL::Int64 = 3
+const global FC_TOL::Float64 = 1e-12
+const global DUMP_NAME::String = "dump.atom"
+const global EQ_NAME::String = "equilibrium.atom"
+const global THERMO_NAME::String = "thermo_data.txt"
 
 struct NormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm 
     simulation_folder::String
@@ -62,9 +65,9 @@ end
 
 function parse_simulation_data(path::String)
 
-    equilibrium_data_path = joinpath(path, "equilibrium.atom")
-    dump_path = joinpath(path, "dump.atom")
-    thermo_path = joinpath(path,"thermo_data.txt")
+    equilibrium_data_path = joinpath(path, EQ_NAME)
+    dump_path = joinpath(path, DUMP_NAME)
+    thermo_path = joinpath(path, THERMO_NAME)
 
     eq = LammpsDump(equilibrium_data_path);
     parse_timestep!(eq, 1)
