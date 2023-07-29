@@ -83,13 +83,13 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
     # current_positions = zeros(size(initial_positions))
     
     #Pre-allocate
-    mode_potential_order3 = zeros(N_modes, nma.ld.n_samples) #TODO: allocating might not work well for big data but H5 is slow at small writes
+    mode_potential_order3 = zeros(N_modes, nma.ld.n_samples)
     total_eng_NM = zeros(nma.ld.n_samples)
 
-    #TODO: Make bar work in parallel?? or just remove
-    @showprogress 10 "NMA Loop" for i in 1:nma.ld.n_samples
+    #TODO CAN I JUST DO THIS ALL ON GPU?
+    for i in 1:nma.ld.n_samples
 
-        parse_next_timestep!(nma.ld, dump_file) #TODO: benchmark this, probably is second slowest part
+        parse_next_timestep!(nma.ld, dump_file)
         
         #Calculate displacements
         # copyto!(current_positions, ld.data_storage[!, ["xu","yu","zu"]])
@@ -102,7 +102,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
         copyto!(cuQ, q)
 
         #Calculate energy from INMs at timestep i
-        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ U_TEP3_n_CUDA(cuK3, cuQ)
+        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ U_TEP3_n_CUDA(cuK3, cuQ) #TODO SLOWEST STEP, HOW TO MINIMIZE GPU TRANSFERS?
         total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + nma.pot_eng_MD[1]
         
     end

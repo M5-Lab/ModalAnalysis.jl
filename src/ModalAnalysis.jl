@@ -1,5 +1,6 @@
 module ModalAnalysis
 
+using LinearAlgebra
 using CairoMakie
 using DataFrames
 using TensorOperations
