@@ -33,6 +33,9 @@ function NormalModeAnalysis(simulation_folder, pot, temperature)
     atom_masses, pot_eng_MD, T_avg, eq, ld = parse_simulation_data(simulation_folder)
     check_temp(nma, T_avg)
 
+    @assert issubset(["xu","yu","zu"], eq.header_data["fields"]) "NMA equilibrium data needs xu, yu and zu fields"
+    @assert issubset(["xu","yu","zu"], ld.header_data["fields"]) "NMA dump data needs xu, yu and zu fields"
+
     box_sizes = [ld.header_data["L_x"][2], ld.header_data["L_y"][2], ld.header_data["L_z"][2]]
     sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "xu", "yu", "zu")
 

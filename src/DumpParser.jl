@@ -2,7 +2,8 @@ export LammpsDump, parse_timestep!, parse_next_timestep!, get_col
 
 struct LammpsDump{HD,DD}
     header_length::UInt32
-    header_data::HD
+    header_data::HD #TODO: Make NamedTuple
+    col_idxs::Dict{String,Integer}
     n_lines::UInt32
     n_samples::UInt32
     data_storage::DD
@@ -18,7 +19,10 @@ function LammpsDump(path; header_length = 9)
     values = (zeros(header_data["N_atoms"]) for _ in 1:length(header_data["fields"]))
     dump_data = DataFrame( NamedTuple{names}(values));
 
-    return LammpsDump{typeof(header_data), typeof(dump_data)}(header_length, header_data, n_lines, n_samples, dump_data, path)
+    #Create dict that maps col names to indices
+    col_idxs = Dict(field => i for (i,field) in enumerate(header_data["fields"]))
+
+    return LammpsDump{typeof(header_data), typeof(dump_data)}(header_length, header_data, col_idxs, n_lines, n_samples, dump_data, path)
 end
 
 Base.length(ld::LammpsDump) = ld.n_samples
@@ -103,6 +107,21 @@ function parse_next_timestep!(ld::LammpsDump, io::IOStream)
 
     return ld, io
 
+end
+
+"""
+Parse `cols` of next timestep from `io` associated with `ld`. Output stored in `out`. 
+"""
+function parse_next_timestep!(out::Matrix{T}, ld::LammpsDump, io::IOStream, cols::Vector{<:Integer}) where T
+    #Skip header 
+    for _ in range(1, ld.header_length) readline(io) end
+
+    #Parse atom data
+    for j in range(1, ld.header_data["N_atoms"])
+        out[j,:] .= parse.(T, split(strip(readline(io)))[cols])
+    end
+
+    return out, ld, io
 end
 
 """

@@ -69,31 +69,31 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
 
     mass_sqrt = sqrt.(nma.atom_masses)
 
-    K3 = Float32.(K3)
+    K3 = Float32.(K3) #TODO MAKE TYPE A PARAMETER FOR MCC3 TO SAVE TIME CASTING (matters more for INMS)
     cuK3 = CUDA.CuArray(K3)
     
-    #Pre-allocate data_storage
+    #Pre-allocate intermediate data_storage
     disp = zeros(N_atoms, 3); disp_mw = zeros(N_modes)
     q = zeros(Float32,N_modes)
     cuQ = CUDA.zeros(N_modes)
 
     dump_file = open(nma.ld.path, "r")
+    posn_cols = [nma.ld.col_idxs["xu"],nma.ld.col_idxs["yu"],nma.ld.col_idxs["zu"]]
     initial_positions = Matrix(nma.eq.data_storage[!, ["xu","yu","zu"]])
-
-    # current_positions = zeros(size(initial_positions))
+    current_positions = zeros(size(initial_positions))
     
-    #Pre-allocate
+    #Pre-allocate output arrays
     mode_potential_order3 = zeros(N_modes, nma.ld.n_samples)
     total_eng_NM = zeros(nma.ld.n_samples)
 
-    #TODO CAN I JUST DO THIS ALL ON GPU?
     for i in 1:nma.ld.n_samples
 
-        parse_next_timestep!(nma.ld, dump_file)
+        parse_next_timestep!(current_positions, nma.ld, dump_file, posn_cols)
+        # parse_next_timestep!(nma.ld, dump_file)
         
         #Calculate displacements
-        # copyto!(current_positions, ld.data_storage[!, ["xu","yu","zu"]])
-        disp .= Matrix(nma.ld.data_storage[!, ["xu","yu","zu"]]) .- initial_positions #TODO DF -> Matrix requires an allocation
+        # disp .= Matrix(nma.ld.data_storage[!, ["xu","yu","zu"]]) .- initial_positions #TODO DF -> Matrix requires an allocation
+        disp .= current_positions .- initial_positions
         disp .*= mass_sqrt 
         disp_mw .= reduce(vcat, eachrow(disp))
 
@@ -102,7 +102,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
         copyto!(cuQ, q)
 
         #Calculate energy from INMs at timestep i
-        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ U_TEP3_n_CUDA(cuK3, cuQ) #TODO SLOWEST STEP, HOW TO MINIMIZE GPU TRANSFERS?
+        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_n_CUDA(cuK3, cuQ)) #&slowest step, can I make TensorOpt faster? just do on CPU
         total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + nma.pot_eng_MD[1]
         
     end
@@ -115,3 +115,4 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
 
     close(dump_file)
 end
+
