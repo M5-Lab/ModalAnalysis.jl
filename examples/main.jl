@@ -12,7 +12,6 @@ using DelimitedFiles
 import CUDA
 
 #TODO: get it to handle units
-#TODO: write data in another CPU thread??
 
 function balanced_partition(arr, n)
     len = length(arr)
@@ -24,16 +23,19 @@ function balanced_partition(arr, n)
 end
 
 pot = LJ(3.4, 0.24037, 8.5);
-base_path = "/home/emeitz/MD_data/NMA_LJ_FCC_4UC/"
-# TEP_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_4UC\TEP.jld2"
-TEP_path = raw"/home/emeitz/MD_data/NMA_LJ_FCC_4UC/TEP.jld2"
+base_path = raw"C:\Users\ejmei\Desktop\WTF\Fresh Run"
+# base_path = "/home/emeitz/MD_data/NMA_LJ_FCC_4UC/"
+TEP_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_4UC\TEP.jld2"
+# TEP_path = raw"/home/emeitz/MD_data/NMA_LJ_FCC_4UC/TEP.jld2"
 kB = ustrip(u"kcal * mol^-1 * K^-1", Unitful.k*Unitful.Na)
 
-temps = [40,50,60,70,80] #already ran 10-30
-n_seeds = 10
+# temps = [10,20,30,40,50,60,70,80]
+temps = [10]
+# n_seeds = 10
+n_seeds = 1
 
 total_threads = Threads.nthreads()
-gpu_ids = CUDA.devices()
+gpu_ids = [0]#CUDA.devices()
 threads_per_task = div(total_threads, length(gpu_ids))
 
 param_combos = Iterators.product(temps, 1:n_seeds)
@@ -45,7 +47,7 @@ gpu_jobs = balanced_partition(collect(param_combos), length(gpu_ids))
 @sync for (gpu_id, gpu_job) in enumerate(gpu_jobs)
     # New CPU Thread for Each GPU
     Threads.@spawn begin
-        CUDA.device!(gpu_id)
+        CUDA.device!(gpu_id-1)
         #Launch GPU Jobs in Serial
         for param_combo in gpu_job
             temp, seed = param_combo
@@ -53,43 +55,28 @@ gpu_jobs = balanced_partition(collect(param_combos), length(gpu_ids))
             @info "Starting temperature $(temp), seed $(seed) on GPU $(gpu_id)"
             seed_path = joinpath(base_path,"$(temp)K/seed$(seed-1)")
 
-            equilibrium_data_path = joinpath(seed_path, "equilibrium.atom")
-            dump_path = joinpath(seed_path, "dump.atom")
-            thermo_path = joinpath(seed_path,"thermo_data.txt")
+            nma = NormalModeAnalysis(seed_path, pot, temp)
 
-            eq = LammpsDump(equilibrium_data_path);
-            parse_timestep!(eq, 1)
-            atom_masses = get_col(eq, "mass")
+            ModalAnalysis.run(nma, TEP_path)
 
-            ld = LammpsDump(dump_path);
+            NM_postprocess(nma, kB; nthreads = threads_per_task, average_identical_freqs = true)
 
-            #Load Thermo Data & Masses
-            pe_col = 3; T_col = 2
-            thermo_data = readdlm(thermo_path, skipstart = 2);
-            potential_eng_MD = thermo_data[:,pe_col]
-            temps_MD = thermo_data[:, T_col]
-
-            T_avg = mean(temps_MD)
-
-            NMA(eq, ld, potential_eng_MD, atom_masses, seed_path, TEP_path, gpu_id)
-            NM_postprocess(seed_path, dirname(TEP_path), kB, T_avg;
-                nthreads = threads_per_task, average_identical_freqs = true)
         end
     end
 end
 
-temps = [10,20,30,40,50,60,70,80]
+for param_combo in param_combos
+    temp, seed = param_combo
+    seed_path = joinpath(base_path,"$(temp)K/seed$(seed-1)")
+    make_plots(seed_path, temp)
+end
+
 MD_cv_arr = zeros(length(temps))
 MD_std_err_arr = zeros(length(temps))
 TEP_cv_arr = zeros(length(temps))
 TEP_std_err_arr = zeros(length(temps))
-Threads.@threads for (i,temp) in collect(enumerate(temps))
-    temp_path = joinpath(base_path,"$(temp)K")
-    MD_cv_total_avg, MD_cv_std_err, TEP_cv_total_avg, TEP_cv_std_err = NMA_avg_seeds(temp_path, n_seeds)
-    TEP_cv_arr[i] = TEP_cv_total_avg
-    TEP_std_arr[i] = TEP_cv_std
-    MD_cv_arr[i] = MD_cv_total_avg
-    MD_std_arr[i] = MD_cv_std
+for (i,temp) in collect(enumerate(temps))
+    NMA_avg_seeds(joinpath(base_path, "$(temp)K"), n_seeds, temp)
 end
 
 f = Figure()

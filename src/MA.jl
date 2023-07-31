@@ -31,7 +31,7 @@ end
 
 function NormalModeAnalysis(simulation_folder, pot, temperature)
     atom_masses, pot_eng_MD, T_avg, eq, ld = parse_simulation_data(simulation_folder)
-    check_temp(nma, T_avg)
+    check_temp(temperature, T_avg)
 
     @assert issubset(["xu","yu","zu"], eq.header_data["fields"]) "NMA equilibrium data needs xu, yu and zu fields"
     @assert issubset(["xu","yu","zu"], ld.header_data["fields"]) "NMA dump data needs xu, yu and zu fields"

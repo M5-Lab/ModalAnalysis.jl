@@ -7,13 +7,13 @@ export run
 """
 
 # Calculate MCC fresh
-function run(nma::NormalModeAnalysis, out_path::String)
+function run(nma::NormalModeAnalysis)
 
     # Initialize NMs to 3rd Order
     freqs_sq, phi, dynmat, F3, K3 = get_modal_data(nma)
     
     #Save mode data
-    jldopen(joinpath(out_path, "TEP.jld2"), "w") do file
+    jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w") do file
         file["freqs_sq"] = freqs_sq
         file["phi"] = phi
         file["F3"] = F3.values
@@ -21,17 +21,17 @@ function run(nma::NormalModeAnalysis, out_path::String)
         file["dynmat"] = dynmat.values
     end
 
-    NMA_loop(nma, out_path, freqs_sq, phi, K3)
+    NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3)
 end
 
 #Calculate MCC with blocked-approach to save RAM
-function run(nma::NormalModeAnalysis, out_path::String, mcc_block_size::Integer)
+function run(nma::NormalModeAnalysis, mcc_block_size::Integer)
 
     # Initialize NMs to 3rd Order
     freqs_sq, phi, dynmat, F3, K3 = get_modal_data(nma, mcc_block_size)
     
     #Save mode data
-    jldopen(joinpath(out_path, "TEP.jld2"), "w") do file
+    jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w") do file
         file["freqs_sq"] = freqs_sq
         file["phi"] = phi
         file["F3"] = F3.values
@@ -39,11 +39,11 @@ function run(nma::NormalModeAnalysis, out_path::String, mcc_block_size::Integer)
         file["dynmat"] = dynmat.values
     end
 
-    NMA_loop(nma, out_path, freqs_sq, phi, K3)
+    NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3)
 end
 
 #Re-use MCC from a previous simulation
-function run(nma::NormalModeAnalysis, out_path::String, TEP_path::String)
+function run(nma::NormalModeAnalysis, TEP_path::String)
     
     f = jldopen(TEP_path, "r"; parallel_read = true)
     freqs_sq = f["freqs_sq"]
@@ -53,13 +53,18 @@ function run(nma::NormalModeAnalysis, out_path::String, TEP_path::String)
     close(f)
 
     #Always save a copy of freqs and phi for post processing stuff
-    jldopen(joinpath(out_path, "TEP.jld2"), "w") do file
+    jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w") do file
         file["freqs_sq"] = freqs_sq
         file["phi"] = phi
         file["dynmat"] = dynmat
     end
 
-    NMA_loop(nma, out_path, freqs_sq, phi, K3)
+    timer = TimerOutput()
+    @timeit timer "NMA_loop" NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3)
+
+    open(joinpath(nma.simulation_folder, "timings.txt"), "a+") do f
+        print_timer(f, timer)
+    end
 end 
 
 

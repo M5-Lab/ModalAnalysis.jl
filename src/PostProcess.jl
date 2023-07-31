@@ -1,41 +1,17 @@
-export NM_postprocess, NMA_avg_seeds
+export NM_postprocess, NMA_avg_seeds, make_plots
 
-"""
-Expects `per_mode_potential` to be (N_modes x N_samples)
-"""
-function build_cov_matrix(per_mode_potential::AbstractVector, N_modes::Integer, nthreads::Integer, kB, T)
+function NM_postprocess(nma::NormalModeAnalysis, kB;
+    nthreads::Integer = Threads.nthreads(), average_identical_freqs = true, run_ks_tests = true)
 
-    cv3_cov = zeros(N_modes, N_modes)
-    per_mode_potential = permutedims(per_mode_potential) #flip to get column major access
-    Threads.@threads for thread_id in 1:nthreads
-        for n in thread_id:nthreads:N_modes
+    timer = TimerOutput()
 
-            cv3_cov[n,n] = var(per_mode_potential[:,n])/(kB*T*T)
-
-            #Covariance terms
-            for m in range(n+1,N_modes)
-                @views cv3_cov[n,m] = cov(per_mode_potential[:,n], per_mode_potential[:,m])/(kB*T*T)
-                cv3_cov[m,n] = cv3_cov[n,m]
-            end
-        end
-    end
-
-    cv3_per_mode = sum(cv3_cov, dims = 2);
-    cv3_total = sum(cv3_per_mode)
-
-    return cv3_cov, cv3_per_mode, cv3_total
-end
-
-
-function NM_postprocess(energies_path::String, tep_path::String, 
-        kB, T; nthreads::Integer = Threads.nthreads(), average_identical_freqs = true)
-
-    NMA_filepath = joinpath(energies_path, "ModeEnergies.jld2")
-    TEP_filepath = joinpath(tep_path, "TEP.jld2")
+    T = nma.temperature
+    energies_path = joinpath(nma.simulation_folder, "ModeEnergies.jld2")
+    tep_path = joinpath(nma.simulation_folder, "TEP.jld2")
 
     potential_eng_MD, potential_eng_TEP, mode_potential_order3 =
-        load(NMA_filepath, "potential_eng_MD", "total_eng_NM", "mode_potential_order3")
-    freqs_sq = load(TEP_filepath, "freqs_sq")
+        load(energies_path, "pot_eng_MD", "total_eng_NM", "mode_potential_order3")
+    freqs_sq = load(tep_path, "freqs_sq")
 
     N_modes = length(freqs_sq)
 
@@ -50,16 +26,7 @@ function NM_postprocess(energies_path::String, tep_path::String,
     cv_total_MD = var(potential_eng_MD)/(kB*T*T)
     cv_TEP_total = var(potential_eng_TEP)/(kB*T*T)
 
-    #Save system level energy histograms
-    # f = Figure()
-    # ax = Axis(f[1,1], xlabel = "Potential Energy", ylabel = "PDF")
-    # s1 = stephist!(potential_eng_MD, normalization = :pdf)
-    # s2 = stephist!(potential_eng_TEP, normalization = :pdf)
-    # Legend(f[1,2], [s1,s2], ["MD", "TEP"], "Energy Calculator")
-    # save(joinpath(energies_path,"pot_eng_hist.svg"), f)
-
-
-    cv3_cov, cv3_per_mode, cv3_total = 
+    @timeit timer "Cov Matrix" cv3_cov, cv3_per_mode, cv3_total = 
         build_cov_matrix(mode_potential_order3, N_modes, nthreads, kB, T)
 
 
@@ -70,42 +37,61 @@ function NM_postprocess(energies_path::String, tep_path::String,
             idxs = findall(x -> x == f, freqs)
             cv3_avg_freq[i] = sum(cv3_per_mode[idxs])/length(idxs)
         end
-
-        # f = Figure()
-        # Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\text{Mode Heat Capacity / }k_{\text{B}}",
-        #     title = "Heat Capacity per Mode Avg by Freq: T = $(round(T,sigdigits = 4))")
-        # scatter!(unique_freqs, vec(cv3_avg_freq)./kB);
-        # save(joinpath(energies_path,"heat_cap_per_mode_avg_freq.svg"), f)
     end
-
-    #Plot mode heat capacities -- raw output
-    # f = Figure()
-    # ax = Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\text{Mode Heat Capacity / }k_{\text{B}}",
-    #     title = "Heat Capacity per Mode: T = $T")
-    # scatter!(freqs, vec(cv3_per_mode)./kB);
-    # save(joinpath(energies_path,"heat_cap_per_mode.svg"), f)
 
     #Sanity check
     if !isapprox(cv3_total, cv_TEP_total, atol = 1e-4)
         @warn "Sum of modal heat capacities ($(cv3_total)) does not match heat capacity from total TEP energy ($(cv_TEP_total))"
     end
 
+    run_ks_tests && @timeit timer "KS Tests" run_ks_experiments(nma.simulation_folder)
+
     #Save heat capacity data
     if average_identical_freqs
-        jldsave(joinpath(energies_path, "cv_data.jld2"), 
+        jldsave(joinpath(nma.simulation_folder, "cv_data.jld2"), 
             cv_total_MD = cv_total_MD, cv_total_MD_norm = cv_total_MD/(N_modes*kB),
             cv3_total = cv3_total, cv3_total_norm = cv3_total/(N_modes*kB),
             cv3_per_mode = cv3_per_mode, cv3_per_mode_norm = cv3_per_mode./kB,
             cv3_avg_freq = cv3_avg_freq, cv3_avg_freq_norm = cv3_avg_freq./kB,
             cv3_cov = cv3_cov, freqs = unique_freqs, freqs_all = freqs)
     else
-        jldsave(joinpath(energies_path, "cv_data.jld2"), 
+        jldsave(joinpath(nma.simulation_folder, "cv_data.jld2"), 
         cv_total_MD = cv_total_MD, cv_total_MD_norm = cv_total_MD/(N_modes*kB),
         cv3_total = cv3_total, cv3_total_norm = cv3_total/(N_modes*kB),
         cv3_per_mode = cv3_per_mode, cv3_per_mode_norm = cv3_per_mode./kB,
         cv3_cov = cv3_cov, freqs = freqs)
     end
 
+    open(joinpath(nma.simulation_folder, "timings.txt"), "a+") do f
+        print_timer(f, timer, title = "NMA Post")
+    end
+
+end
+
+"""
+Expects `per_mode_potential` to be (N_modes x N_samples)
+"""
+function build_cov_matrix(per_mode_potential::Matrix, N_modes::Integer, nthreads::Integer, kB, T)
+
+    cv3_cov = zeros(N_modes, N_modes)
+    per_mode_potential = permutedims(per_mode_potential) #flip to get column major access
+    Threads.@threads for thread_id in 1:nthreads
+        for n in thread_id:nthreads:N_modes
+
+            cv3_cov[n,n] = @views var(per_mode_potential[:,n])/(kB*T*T)
+
+            #Covariance terms
+            for m in range(n+1,N_modes)
+                @views cv3_cov[n,m] = cov(per_mode_potential[:,n], per_mode_potential[:,m])/(kB*T*T)
+                cv3_cov[m,n] = cv3_cov[n,m]
+            end
+        end
+    end
+
+    cv3_per_mode = sum(cv3_cov, dims = 2);
+    cv3_total = sum(cv3_per_mode)
+
+    return cv3_cov, cv3_per_mode, cv3_total
 end
 
 
@@ -124,7 +110,7 @@ end
 "Goes through multiple seeds of NMA data and averages into one dataset. 
 Looks for the cv_data.jld2 file generated by NM analysis at: \"/<basepath>/<seed_subfolder><N>\". 
 Where `basepath` and `seed_subfolder` are function parameters"
-function NMA_avg_seeds(basepath, n_seeds; 
+function NMA_avg_seeds(basepath, n_seeds, T; 
     seed_subfolder::String = "seed", seeds_zero_indexed::Bool = true)
 
     #All have same freqs just load one
@@ -132,7 +118,7 @@ function NMA_avg_seeds(basepath, n_seeds;
     
     MD_cv_total = []
     TEP_cv_total = []
-    TEP_cv_avg_by_freq_avg = zeros(length(freqs)) #avgerage, averaged over seeds since they all have same freqs
+    TEP_cv_avg_by_freq_avg = zeros(n_seeds, length(freqs)) #avgerage, averaged over seeds since they all have same freqs
     
     for seed in 1:n_seeds
         seed_path = joinpath(basepath,"$(seed_subfolder)$(seed-seeds_zero_indexed)/cv_data.jld2")
@@ -141,123 +127,126 @@ function NMA_avg_seeds(basepath, n_seeds;
         push!(MD_cv_total, cv_total_MD_norm)
         push!(TEP_cv_total, cv3_total_norm)
         
-        TEP_cv_avg_by_freq_avg .+= cv3_avg_freq_norm
-
+        TEP_cv_avg_by_freq_avg[seed, :] .+= cv3_avg_freq_norm
     end
     
     MD_cv_total_avg = mean(MD_cv_total)
-    MD_cv_std_err = std(MD_cv_total)/sqrt(length(MD_cv_total))
+    MD_cv_std_err = std(MD_cv_total)/sqrt(n_seeds)
     TEP_cv_total_avg = mean(TEP_cv_total)
-    TEP_cv_std_err = std(TEP_cv_total)/sqrt(length(MD_cv_total))
-    TEP_cv_avg_by_freq_avg ./= n_seeds
+    TEP_cv_std_err = std(TEP_cv_total)/sqrt(n_seeds)
+    TEP_cv_per_mode_avg =  [mean(TEP_cv_avg_by_freq_avg[:, i]) for i in 1:length(freqs)]
+    TEP_cv_per_mode_std_err = [std(TEP_cv_avg_by_freq_avg[:, i])/sqrt(n_seeds) for i in 1:length(freqs)]
     
 
     f = Figure()
     ax = Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\text{Mode Heat Capacity / }k_{\text{B}}",
-        title = "$(temp)K", yticks = [0.0,0.25,0.5])
-    scatter!(freqs, vec(TEP_cv_avg_by_freq_avg[:,i]));
-    ylims!(ax, (-0.05, 0.55))
-    save(joinpath(basepath, "freqs_$(temp)K.svg"), f)
+        title = "$(T)K", yticks = [0.0,0.25,0.5])
+    (n_seeds > 1) && errorbars!(freqs, vec(TEP_cv_per_mode_avg), TEP_cv_per_mode_std_err, TEP_cv_per_mode_std_err, whiskerwidth = 3, direction = :y)
+    scatter!(freqs, vec(TEP_cv_per_mode_avg));
+    save(joinpath(basepath, "freqs_$(T)K.svg"), f)
 
-    return MD_cv_total_avg, MD_cv_std_err, TEP_cv_total_avg, TEP_cv_std_err
+    jldsave(joinpath(basepath, "cv_data_averaged.jld2"), cv_MD_total_avg = MD_cv_total_avg,
+        MD_cv_std_err = MD_cv_std_err, TEP_cv_total_avg = TEP_cv_total_avg, TEP_cv_std_err = TEP_cv_std_err,
+        TEP_cv_per_mode_avg = TEP_cv_per_mode_avg, TEP_cv_per_mode_std_err = TEP_cv_per_mode_std_err)
     
 end
 
 
 # Makes plots that cannot be made in analysis of MD data due to the non-thread-safe nature of plots in Julia
-function make_plots(mode_energies_path, cv_data_path; normalize_cv = true, duplicate_freqs_averaged = true)
+function make_plots(simulation_folder::String, T; normalize_cv = true, duplicate_freqs_averaged = true)
 
-    potential_eng_MD, potential_eng_TEP, mode_potential_order3 =
-        load(NMA_filepath, "potential_eng_MD", "total_eng_NM", "mode_potential_order3")
+    mode_energies_path = joinpath(simulation_folder, "ModeEnergies.jld2")
+    cv_data_path = joinpath(simulation_folder, "cv_data.jld2")
 
-    system_energy_hist(mode_energies_path, potential_eng_MD, potential_eng_TEP)
+    pot_eng_MD, potential_eng_TEP =
+        load(mode_energies_path, "pot_eng_MD", "total_eng_NM", "mode_potential_order3")
+
+    system_energy_hist(simulation_folder, pot_eng_MD, potential_eng_TEP)
 
     if duplicate_freqs_averaged
         freqs_unique, freqs_all = load(cv_data_path, "freqs", "freqs_all")
         if normalize_cv
             cv3_avg_freq_norm, cv3_per_mode_norm = load(cv_data_path, "cv3_avg_freq_norm","cv3_per_mode_norm")
-            heat_cap_per_mode_scatter(mode_energies_path, freqs_all, cv3_per_mode_norm, "heat_cap_per_mode_norm")
-            heat_cap_per_mode_scatter(mode_energies_path, freqs_unique, cv3_avg_freq_norm, "heat_cap_per_mode_avg_freq_norm")
+            heat_cap_per_mode_scatter(simulation_folder, freqs_all, cv3_per_mode_norm, T, "heat_cap_per_mode_norm")
+            heat_cap_per_mode_scatter(simulation_folder, freqs_unique, cv3_avg_freq_norm, T, "heat_cap_per_mode_avg_freq_norm")
         else
             cv3_avg_freq, cv3_per_mode = load(cv_data_path, "cv3_avg_freq","cv3_per_mode")
-            heat_cap_per_mode_scatter(mode_energies_path, freqs_all, cv3_per_mode, "heat_cap_per_mode")
-            heat_cap_per_mode_scatter(mode_energies_path, freqs_unique, cv3_avg_freq, "heat_cap_per_mode_avg_freq")
+            heat_cap_per_mode_scatter(simulation_folder, freqs_all, cv3_per_mode, T, "heat_cap_per_mode")
+            heat_cap_per_mode_scatter(simulation_folder, freqs_unique, cv3_avg_freq, T, "heat_cap_per_mode_avg_freq")
         end
     else
         freqs_all = load(cv_data_path, "freqs")
         if normalize_cv
             cv3_per_mode_norm = load(cv_data_path, "cv3_per_mode_norm")
-            heat_cap_per_mode_scatter(mode_energies_path, freqs_all, cv3_per_mode_norm, "heat_cap_per_mode_norm")
+            heat_cap_per_mode_scatter(simulation_folder, freqs_all, cv3_per_mode_norm, T, "heat_cap_per_mode_norm")
         else
             cv3_per_mode = load(cv_data_path, "cv3_per_mode")
-            heat_cap_per_mode_scatter(mode_energies_path, freqs_all, cv3_per_mode, "heat_cap_per_mode")
+            heat_cap_per_mode_scatter(simulation_folder, freqs_all, cv3_per_mode, T, "heat_cap_per_mode")
         end
     end
 
 
 end
 
-function system_energy_hist(mode_energies_path::String, potential_eng_MD, potential_eng_TEP)
+function system_energy_hist(simulation_folder::String, pot_eng_MD, potential_eng_TEP)
 
     #System level energy histograms
     f = Figure()
     ax = Axis(f[1,1], xlabel = "Potential Energy", ylabel = "PDF")
-    s1 = stephist!(potential_eng_MD, normalization = :pdf)
+    s1 = stephist!(pot_eng_MD, normalization = :pdf)
     s2 = stephist!(potential_eng_TEP, normalization = :pdf)
     Legend(f[1,2], [s1,s2], ["MD", "TEP"], "Energy Calculator")
-    save(joinpath(mode_energies_path,"pot_eng_hist.svg"), f)
+    save(joinpath(simulation_folder,"pot_eng_hist.svg"), f)
 
 end
-#TODO ADD ERROR BARS
-function heat_cap_per_mode_scatter(mode_energies_path::String, freqs, cv3_per_mode, plot_name::String)
+
+function heat_cap_per_mode_scatter(simulation_folder::String, freqs, cv3_per_mode, T, plot_name::String)
 
     f = Figure()
     ax = Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\text{Mode Heat Capacity / }k_{\text{B}}",
         title = "Heat Capacity per Mode: T = $T")
     scatter!(freqs, vec(cv3_per_mode))
-    save(joinpath(mode_energies_path,"$(plot_name).svg"), f)
+    save(joinpath(simulation_folder,"$(plot_name).svg"), f)
 
 end
 
 # #############################################
+"""
+ -α: p-value required to reject null-hypothesis
+ -n_experiments: Number of times to randomly sample a pair of two distributions
+ -n_samples_per_hist: Number of samples taken in each experiment (with replacement)
+ -required_pass_rate: Pair of histograms is deemed the same if this many pairs of KS test fail to reject H₀
+"""
+function run_ks_experiments(simulation_folder::String;
+     α = 0.05, n_experiments = 20, required_pass_rate = 0.5, n_samples_per_hist = 10000)
+    energy_path = joinpath(simulation_folder, "ModeEnergies.jld2")
 
-function run_ks_experiments()
-    # energy_path = joinpath(base_path, "seed1", "NM_Analysis", "NM_energies.jld2")
+    energies_order3 = load(energy_path, "mode_potential_order3");
 
-    # energies_order3 = load(energy_path, "order3");
+    N_modes = 48
+    p_val_matrix = zeros(N_modes, N_modes)
+    D_matrix = zeros(N_modes, N_modes)
+    pass_matrix = zeros(N_modes, N_modes)
 
-    # n_modes = 48
-    # p_val_matrix = zeros(n_modes, n_modes)
-    # D_matrix = zeros(n_modes, n_modes)
-    # pass_matrix = zeros(n_modes, n_modes)
+    Threads.@threads for i in range(1, N_modes)
+        sample1_storage = zeros(n_samples_per_hist)
+        sample2_storage = zeros(n_samples_per_hist)
+        for j in range(i, N_modes)
+            isSameDist, avg_p_val, avg_δ = @views ks_experiment(energies_order3[i,:], energies_order3[j,:], 
+                sample1_storage, sample2_storage, n_experiments, required_pass_rate, α)
+            p_val_matrix[i,j] = avg_p_val
+            p_val_matrix[j,i] = p_val_matrix[i,j]
+            D_matrix[i,j] = avg_δ
+            D_matrix[j,i] = avg_δ
+            pass_matrix[i,j] = isSameDist
+            pass_matrix[j,i] = isSameDist
+        end
+    end
 
-    # # Number of times to randomly sample a pair of two distributions
-    # n_experiments = 20
-    # # Number of samples taken in each experiment (with replacement)
-    # n_samples_per_hist = 10_000
-    # # Pair of histograms is deemed the same if this many pairs KS test fail to reject H₀
-    # required_pass_rate = 0.5
-    # # P-value needed to reject null-hypothesis
-    # α = 0.05
+    save(joinpath(simulation_folder, "ks_p_val_matrix.png"), colorview(Gray, p_val_matrix))
+    save(joinpath(simulation_folder, "ks_pass_matrix.png"), colorview(Gray, pass_matrix))
+    save(joinpath(simulation_folder, "ks_dist_matrix.png"), colorview(Gray, D_matrix))
 
-    # Threads.@threads for i in range(1, n_modes)
-    #     sample1_storage = zeros(n_samples_per_hist)
-    #     sample2_storage = zeros(n_samples_per_hist)
-    #     for j in range(i, n_modes)
-    #         isSameDist, avg_p_val, avg_δ = @views ks_experiment(energies_order3[i,:], energies_order3[j,:], 
-    #             sample1_storage, sample2_storage, n_experiments, required_pass_rate, α)
-    #         p_val_matrix[i,j] = avg_p_val
-    #         p_val_matrix[j,i] = p_val_matrix[i,j]
-    #         D_matrix[i,j] = avg_δ
-    #         D_matrix[j,i] = avg_δ
-    #         pass_matrix[i,j] = isSameDist
-    #         pass_matrix[j,i] = isSameDist
-    #     end
-    # end
-
-    # imshow(p_val_matrix)
-    # imshow(pass_matrix)
-    # imshow(D_matrix)
 end
 
 

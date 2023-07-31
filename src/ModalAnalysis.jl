@@ -9,6 +9,9 @@ using JLD2
 using StatsBase
 using HypothesisTests
 using CUDA, cuTENSOR
+using DelimitedFiles
+import Images: colorview, Gray, save
+using TimerOutputs
 
 #TODO: register online
 using ForceConstants
