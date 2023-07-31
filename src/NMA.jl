@@ -86,6 +86,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
     mode_potential_order3 = zeros(N_modes, nma.ld.n_samples)
     total_eng_NM = zeros(nma.ld.n_samples)
 
+    #TODO ADD TIMERS (TimerOutputs.jl)
     for i in 1:nma.ld.n_samples
 
         parse_next_timestep!(current_positions, nma.ld, dump_file, posn_cols)
@@ -105,7 +106,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
         mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_n_CUDA(cuK3, cuQ)) #&slowest step, can I make TensorOpt faster? just do on CPU
         total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + nma.pot_eng_MD[1]
         
-    end
+    end 
 
     jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w") do file
         file["mode_potential_order3"] = mode_potential_order3
@@ -115,4 +116,5 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
 
     close(dump_file)
 end
+
 

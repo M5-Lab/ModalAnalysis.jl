@@ -7,11 +7,13 @@ using TensorOperations
 using LoopVectorization
 using JLD2
 using StatsBase
-using ProgressMeter
+using HypothesisTests
 using CUDA, cuTENSOR
 
 #TODO: register online
 using ForceConstants
+
+#TODO add thread pinning if on Linux
 
 # Code to evaluate TEP
 module TEP
