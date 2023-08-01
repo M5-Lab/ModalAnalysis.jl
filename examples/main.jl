@@ -60,8 +60,8 @@ gpu_jobs = balanced_partition(collect(param_combos), length(gpu_ids))
             ModalAnalysis.run(nma, TEP_path)
 
             NM_postprocess(nma, kB; nthreads = threads_per_task, average_identical_freqs = true)
-
         end
+        nothing
     end
 end
 

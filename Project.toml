@@ -6,6 +6,7 @@ version = "0.1.0"
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 ForceConstants = "58688e27-5ad4-4797-95f1-2920f5d19b53"
