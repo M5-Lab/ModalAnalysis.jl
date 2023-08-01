@@ -5,7 +5,7 @@ using CairoMakie
 using DataFrames
 using TensorOperations
 using LoopVectorization
-using JLD2
+using JLD2, CodecZlib
 using StatsBase
 using HypothesisTests
 using CUDA, cuTENSOR
