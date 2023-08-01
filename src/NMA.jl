@@ -13,7 +13,7 @@ function run(nma::NormalModeAnalysis)
     freqs_sq, phi, dynmat, F3, K3 = get_modal_data(nma)
     
     #Save mode data
-    jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w") do file
+    jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w"; compress = true) do file
         file["freqs_sq"] = freqs_sq
         file["phi"] = phi
         file["F3"] = F3.values
@@ -31,7 +31,7 @@ function run(nma::NormalModeAnalysis, mcc_block_size::Integer)
     freqs_sq, phi, dynmat, F3, K3 = get_modal_data(nma, mcc_block_size)
     
     #Save mode data
-    jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w") do file
+    jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w"; compress = true) do file
         file["freqs_sq"] = freqs_sq
         file["phi"] = phi
         file["F3"] = F3.values
@@ -69,6 +69,7 @@ end
 
 
 function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
+
     N_modes = length(freqs_sq)
     N_atoms = length(nma.atom_masses)
 
@@ -95,10 +96,8 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
     for i in 1:nma.ld.n_samples
 
         parse_next_timestep!(current_positions, nma.ld, dump_file, posn_cols)
-        # parse_next_timestep!(nma.ld, dump_file)
         
         #Calculate displacements
-        # disp .= Matrix(nma.ld.data_storage[!, ["xu","yu","zu"]]) .- initial_positions #TODO DF -> Matrix requires an allocation
         disp .= current_positions .- initial_positions
         disp .*= mass_sqrt 
         disp_mw .= reduce(vcat, eachrow(disp))
@@ -113,10 +112,16 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
         
     end 
 
-    jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w") do file
+    timer2 = TimerOutput()
+
+    @timeit timer2 "Energy Write" jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w"; compress = true) do file
         file["mode_potential_order3"] = mode_potential_order3
         file["total_eng_NM"] = total_eng_NM
         file["pot_eng_MD"] = nma.pot_eng_MD
+    end
+
+    open(joinpath(nma.simulation_folder, "timings.txt"), "a+") do f
+        print_timer(f, timer2)
     end
 
     close(dump_file)

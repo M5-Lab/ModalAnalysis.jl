@@ -15,7 +15,7 @@ import CUDA
 
 function balanced_partition(arr, n)
     len = length(arr)
-    size = len ÷ n
+    size = div(len, n)
     remainder = len % n
     starts = [1 + ((i-1) * size) + min(i-1, remainder) for i in 1:n]
     ends = [i * size + min(i, remainder) for i in 1:n]
@@ -46,7 +46,7 @@ gpu_jobs = balanced_partition(collect(param_combos), length(gpu_ids))
 
 @sync for (gpu_id, gpu_job) in enumerate(gpu_jobs)
     # New CPU Thread for Each GPU
-    Threads.@spawn begin
+    @async begin #Threads.@spawn prob better but breaks
         CUDA.device!(gpu_id-1)
         #Launch GPU Jobs in Serial
         for param_combo in gpu_job
@@ -71,10 +71,7 @@ for param_combo in param_combos
     make_plots(seed_path, temp)
 end
 
-MD_cv_arr = zeros(length(temps))
-MD_std_err_arr = zeros(length(temps))
-TEP_cv_arr = zeros(length(temps))
-TEP_std_err_arr = zeros(length(temps))
+
 for (i,temp) in collect(enumerate(temps))
     NMA_avg_seeds(joinpath(base_path, "$(temp)K"), n_seeds, temp)
 end

@@ -90,7 +90,7 @@ function parse_simulation_data(path::String)
 end
 
 function check_temp(T, T_actual::Float64)
-    if !isapprox(T, T_actual, atol = 1e-2)
+    if !isapprox(T, T_actual, atol = 1e-1)
         @warn "ModalAnalysisAlgorithm expected temperature: $(T) but MD simulation average was $(T_actual)"
     end
 end
