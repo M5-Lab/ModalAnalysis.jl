@@ -113,29 +113,40 @@ Where `basepath` and `seed_subfolder` are function parameters"
 function NMA_avg_seeds(basepath, n_seeds, T; 
     seed_subfolder::String = "seed", seeds_zero_indexed::Bool = true)
 
-    #All have same freqs just load one
-    freqs = load(joinpath(basepath, "$(seed_subfolder)$(1-seeds_zero_indexed)/cv_data.jld2"), "freqs")
+    freqs = load(joinpath(basepath, "$(seed_subfolder)$(1-seeds_zero_indexed)/cv_data.jld2"), "freq")
     
     MD_cv_total = []
     TEP_cv_total = []
-    TEP_cv_avg_by_freq_avg = zeros(n_seeds, length(freqs)) #avgerage, averaged over seeds since they all have same freqs
-    
+    cv3_by_freq = Vector{Vector{Float64}}(undef, length(freqs))
+
     for seed in 1:n_seeds
         seed_path = joinpath(basepath,"$(seed_subfolder)$(seed-seeds_zero_indexed)/cv_data.jld2")
-        cv_total_MD_norm, cv3_total_norm, cv3_avg_freq_norm = load(seed_path, "cv_total_MD_norm", "cv3_total_norm", "cv3_avg_freq_norm")
+        cv_total_MD_norm, cv3_total_norm, cv3_per_mode =
+            load(seed_path, "cv_total_MD_norm", "cv3_total_norm", "cv3_avg_freq_norm", "cv3_per_mode")
 
         push!(MD_cv_total, cv_total_MD_norm)
         push!(TEP_cv_total, cv3_total_norm)
         
-        TEP_cv_avg_by_freq_avg[seed, :] .+= cv3_avg_freq_norm
+        #Sort heat capacities by frequency (will do nothing if freqs is all unique)
+        cv3_by_freq = Vector{Vector{Float64}}(undef, length(freqs))
+        for (i, f) in enumerate(unique_freqs)
+            idxs = findall(x -> x == f, freqs)
+            if isdefined(cv3_by_freq, i)
+                append!(cv3_by_freq[i], cv3_per_mode[idxs])
+            else
+                cv3_by_freq[i] = cv3_per_mode[idxs]
+            end
+        end
     end
     
     MD_cv_total_avg = mean(MD_cv_total)
     MD_cv_std_err = std(MD_cv_total)/sqrt(n_seeds)
     TEP_cv_total_avg = mean(TEP_cv_total)
     TEP_cv_std_err = std(TEP_cv_total)/sqrt(n_seeds)
-    TEP_cv_per_mode_avg =  [mean(TEP_cv_avg_by_freq_avg[:, i]) for i in 1:length(freqs)]
-    TEP_cv_per_mode_std_err = [std(TEP_cv_avg_by_freq_avg[:, i])/sqrt(n_seeds) for i in 1:length(freqs)]
+    #Average heat capacities at each freq
+    TEP_cv_per_mode_avg =  [mean(cv3_by_freq[i]) for i in 1:length(freqs)]
+    #StdErr of heat capacity at each freq
+    TEP_cv_per_mode_std_err = [std(cv3_by_freq[i])/sqrt(length(cv3_by_freq)) for i in 1:length(freqs)]
     
 
     f = Figure()
