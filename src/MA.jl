@@ -59,7 +59,7 @@ function InstantaneousNormalModeAnalysis(simulation_folder, pot, temperature)
     check_temp(temperature, T_avg)
 
     box_sizes = [ld.header_data["L_x"][2], ld.header_data["L_y"][2], ld.header_data["L_z"][2]]
-    sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "xu", "yu", "zu")
+    sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "x", "y", "z")
 
     return InstantaneousNormalModeAnalysis{typeof(temperature), eltype(atom_masses)}(
         simulation_folder, pot, temperature, atom_masses, pot_eng_MD, eq, ld, sys)

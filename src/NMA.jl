@@ -67,7 +67,6 @@ function run(nma::NormalModeAnalysis, TEP_path::String)
     end
 end 
 
-
 function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
 
     N_modes = length(freqs_sq)
@@ -108,7 +107,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
 
         #Calculate energy from INMs at timestep i
         mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_n_CUDA(cuK3, cuQ)) #&slowest step, can I make TensorOpt faster? just do on CPU
-        total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + nma.pot_eng_MD[1]
+        total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + nma.pot_eng_MD[1] #TODO this is not equilibrium energy
         
     end 
 

@@ -44,7 +44,7 @@ function NM_postprocess(nma::NormalModeAnalysis, kB;
         @warn "Sum of modal heat capacities ($(cv3_total)) does not match heat capacity from total TEP energy ($(cv_TEP_total))"
     end
 
-    run_ks_tests && @timeit timer "KS Tests" run_ks_experiments(nma.simulation_folder)
+    run_ks_tests && @timeit timer "KS Tests" run_ks_experiments(nma.simulation_folder, N_modes)
 
     #Save heat capacity data
     if average_identical_freqs
@@ -53,7 +53,7 @@ function NM_postprocess(nma::NormalModeAnalysis, kB;
             cv3_total = cv3_total, cv3_total_norm = cv3_total/(N_modes*kB),
             cv3_per_mode = cv3_per_mode, cv3_per_mode_norm = cv3_per_mode./kB,
             cv3_avg_freq = cv3_avg_freq, cv3_avg_freq_norm = cv3_avg_freq./kB,
-            cv3_cov = cv3_cov, freqs = unique_freqs, freqs_all = freqs)
+            cv3_cov = cv3_cov, freqs = freqs)
     else
         jldsave(joinpath(nma.simulation_folder, "cv_data.jld2"), 
         cv_total_MD = cv_total_MD, cv_total_MD_norm = cv_total_MD/(N_modes*kB),
@@ -113,52 +113,50 @@ Where `basepath` and `seed_subfolder` are function parameters"
 function NMA_avg_seeds(basepath, n_seeds, T; 
     seed_subfolder::String = "seed", seeds_zero_indexed::Bool = true)
 
-    freqs = load(joinpath(basepath, "$(seed_subfolder)$(1-seeds_zero_indexed)/cv_data.jld2"), "freq")
-    
+    freqs = load(joinpath(basepath, "$(seed_subfolder)$(1-seeds_zero_indexed)/cv_data.jld2"), "freqs")
+    unique_freqs = unique(freqs)
+
     MD_cv_total = []
     TEP_cv_total = []
-    cv3_by_freq = Vector{Vector{Float64}}(undef, length(freqs))
+    cv3_by_freq = [Float64[] for _ in 1:length(unique_freqs)]
 
     for seed in 1:n_seeds
         seed_path = joinpath(basepath,"$(seed_subfolder)$(seed-seeds_zero_indexed)/cv_data.jld2")
-        cv_total_MD_norm, cv3_total_norm, cv3_per_mode =
-            load(seed_path, "cv_total_MD_norm", "cv3_total_norm", "cv3_avg_freq_norm", "cv3_per_mode")
+        cv_total_MD_norm, cv3_total_norm, cv3_per_mode_norm =
+            load(seed_path, "cv_total_MD_norm", "cv3_total_norm", "cv3_per_mode_norm")
 
         push!(MD_cv_total, cv_total_MD_norm)
         push!(TEP_cv_total, cv3_total_norm)
         
         #Sort heat capacities by frequency (will do nothing if freqs is all unique)
-        cv3_by_freq = Vector{Vector{Float64}}(undef, length(freqs))
         for (i, f) in enumerate(unique_freqs)
             idxs = findall(x -> x == f, freqs)
-            if isdefined(cv3_by_freq, i)
-                append!(cv3_by_freq[i], cv3_per_mode[idxs])
-            else
-                cv3_by_freq[i] = cv3_per_mode[idxs]
-            end
+            append!(cv3_by_freq[i], cv3_per_mode_norm[idxs])
         end
     end
-    
+
     MD_cv_total_avg = mean(MD_cv_total)
-    MD_cv_std_err = std(MD_cv_total)/sqrt(n_seeds)
+    MD_cv_total_std_err = std(MD_cv_total)/sqrt(n_seeds)
     TEP_cv_total_avg = mean(TEP_cv_total)
-    TEP_cv_std_err = std(TEP_cv_total)/sqrt(n_seeds)
+    TEP_cv_total_std_err = std(TEP_cv_total)/sqrt(n_seeds)
     #Average heat capacities at each freq
-    TEP_cv_per_mode_avg =  [mean(cv3_by_freq[i]) for i in 1:length(freqs)]
+    TEP_cv_per_mode_avg =  mean.(cv3_by_freq)
     #StdErr of heat capacity at each freq
-    TEP_cv_per_mode_std_err = [std(cv3_by_freq[i])/sqrt(length(cv3_by_freq)) for i in 1:length(freqs)]
-    
+    TEP_cv_per_mode_std_err = std.(cv3_by_freq)./sqrt.(length.(cv3_by_freq))
+    samples_per_freq = length.(cv3_by_freq)
 
     f = Figure()
     ax = Axis(f[1,1], xlabel = "Mode Frequency", ylabel = L"\text{Mode Heat Capacity / }k_{\text{B}}",
-        title = "$(T)K", yticks = [0.0,0.25,0.5])
-    (n_seeds > 1) && errorbars!(freqs, vec(TEP_cv_per_mode_avg), TEP_cv_per_mode_std_err, TEP_cv_per_mode_std_err, whiskerwidth = 3, direction = :y)
-    scatter!(freqs, vec(TEP_cv_per_mode_avg));
+        title = "$(T)K", titlesize = 20, yticks = [0.0,0.25,0.5], ylabelsize = 30, xlabelsize = 30,
+        yticklabelsize = 20, xticklabelsize = 20)
+    (n_seeds > 1) && errorbars!(unique_freqs, TEP_cv_per_mode_avg, TEP_cv_per_mode_std_err, TEP_cv_per_mode_std_err, whiskerwidth = 3, direction = :y)
+    scatter!(unique_freqs, TEP_cv_per_mode_avg);
     save(joinpath(basepath, "freqs_$(T)K.svg"), f)
 
     jldsave(joinpath(basepath, "cv_data_averaged.jld2"), cv_MD_total_avg = MD_cv_total_avg,
-        MD_cv_std_err = MD_cv_std_err, TEP_cv_total_avg = TEP_cv_total_avg, TEP_cv_std_err = TEP_cv_std_err,
-        TEP_cv_per_mode_avg = TEP_cv_per_mode_avg, TEP_cv_per_mode_std_err = TEP_cv_per_mode_std_err)
+        MD_cv_total_std_err = MD_cv_total_std_err, TEP_cv_total_avg = TEP_cv_total_avg, TEP_cv_total_std_err = TEP_cv_total_std_err,
+        TEP_cv_per_mode_avg = TEP_cv_per_mode_avg, TEP_cv_per_mode_std_err = TEP_cv_per_mode_std_err,
+        unique_freqs = unique_freqs, samples_per_freq)
     
 end
 
@@ -228,13 +226,12 @@ end
  -n_samples_per_hist: Number of samples taken in each experiment (with replacement)
  -required_pass_rate: Pair of histograms is deemed the same if this many pairs of KS test fail to reject H₀
 """
-function run_ks_experiments(simulation_folder::String;
+function run_ks_experiments(simulation_folder::String, N_modes::Integer;
      α = 0.05, n_experiments = 20, required_pass_rate = 0.5, n_samples_per_hist = 10000)
     energy_path = joinpath(simulation_folder, "ModeEnergies.jld2")
 
     energies_order3 = load(energy_path, "mode_potential_order3");
 
-    N_modes = 48
     p_val_matrix = zeros(N_modes, N_modes)
     D_matrix = zeros(N_modes, N_modes)
     pass_matrix = zeros(N_modes, N_modes)
