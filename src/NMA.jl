@@ -10,13 +10,12 @@ export run
 function run(nma::NormalModeAnalysis)
 
     # Initialize NMs to 3rd Order
-    freqs_sq, phi, dynmat, F3, K3 = get_modal_data(nma)
+    freqs_sq, phi, dynmat, K3 = get_modal_data(nma)
     
     #Save mode data
     jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w"; compress = true) do file
         file["freqs_sq"] = freqs_sq
         file["phi"] = phi
-        file["F3"] = F3.values
         file["K3"] = K3
         file["dynmat"] = dynmat.values
     end
@@ -28,13 +27,12 @@ end
 function run(nma::NormalModeAnalysis, mcc_block_size::Integer)
 
     # Initialize NMs to 3rd Order
-    freqs_sq, phi, dynmat, F3, K3 = get_modal_data(nma, mcc_block_size)
+    freqs_sq, phi, dynmat, K3 = get_modal_data(nma, mcc_block_size)
     
     #Save mode data
     jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w"; compress = true) do file
         file["freqs_sq"] = freqs_sq
         file["phi"] = phi
-        file["F3"] = F3.values
         file["K3"] = K3
         file["dynmat"] = dynmat.values
     end
@@ -91,13 +89,13 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
     mode_potential_order3 = zeros(N_modes, nma.ld.n_samples)
     total_eng_NM = zeros(nma.ld.n_samples)
 
-    #TODO ADD TIMERS (TimerOutputs.jl)
     for i in 1:nma.ld.n_samples
 
         parse_next_timestep!(current_positions, nma.ld, dump_file, posn_cols)
         
         #Calculate displacements
         disp .= current_positions .- initial_positions
+
         disp .*= mass_sqrt 
         disp_mw .= reduce(vcat, eachrow(disp))
 
@@ -108,7 +106,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
         #Calculate energy from INMs at timestep i
         mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_n_CUDA(cuK3, cuQ)) #&slowest step, can I make TensorOpt faster? just do on CPU
         total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + nma.pot_eng_MD[1] #TODO this is not equilibrium energy
-        
+
     end 
 
     timer2 = TimerOutput()

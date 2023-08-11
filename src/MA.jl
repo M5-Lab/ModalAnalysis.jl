@@ -100,15 +100,16 @@ function get_modal_data(ma::ModalAnalysisAlgorithm)
     dynmat = dynamicalMatrix(ma.sys, ma.potential, FC_TOL)
     freqs_sq, phi = get_modes(dynmat)
 
-    Ψ = third_order_IFC(ma.sys, ma.potential, FC_TOL);
-    @info "IFC3 calculation complete"
-    Ψ = mass_weight_third_order!(Ψ, masses(sys))
+    Ψ = third_order_IFC(ma.sys, ma.potential, FC_TOL); #&this probably slows down INMs most
 
-    cuΨ = CuArray(Ψ.values); cuPhi = CuArray(Float32.(phi))
-    K3 = mcc3(cuΨ, cuPhi, tol = FC_TOL);
+    @info "IFC3 calculation complete"
+    Ψ = mass_weight_third_order!(Ψ, masses(ma.sys)) #&can I make this float32 throughout?
+
+    cuΨ = CuArray{Float32}(Ψ.values); cuPhi = CuArray(Float32.(phi))
+    K3 = mcc3(cuΨ, cuPhi);
 
     @info "MCC3 calculation complete"
-    return freqs_sq, phi, dynmat, Ψ, K3
+    return freqs_sq, phi, dynmat, K3
 end
 
 function get_modal_data(ma::ModalAnalysisAlgorithm, mcc_block_size::Integer)
@@ -117,13 +118,13 @@ function get_modal_data(ma::ModalAnalysisAlgorithm, mcc_block_size::Integer)
 
     Ψ = third_order_IFC(ma.sys, ma.potential, FC_TOL);
     @info "IFC3 calculation complete"
-    Ψ = mass_weight_third_order!(Ψ, masses(sys))
+    Ψ = mass_weight_third_order!(Ψ, masses(ma.sys))
 
     cuΨ = CuArray{Float32}(Ψ.values); cuPhi = CuArray{Float32}(phi)
-    K3 = mcc3(cuΨ, cuPhi, mcc_block_size, tol = FC_TOL);
+    K3 = mcc3(cuΨ, cuPhi, mcc_block_size);
 
     @info "MCC3 calculation complete"
-    return freqs_sq, phi, dynmat, Ψ, K3
+    return freqs_sq, phi, dynmat, K3
 end
 
  
