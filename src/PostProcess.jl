@@ -173,7 +173,8 @@ function make_plots(simulation_folder::String, T; normalize_cv = true, duplicate
     system_energy_hist(simulation_folder, pot_eng_MD, potential_eng_TEP)
 
     if duplicate_freqs_averaged
-        freqs_unique, freqs_all = load(cv_data_path, "freqs", "freqs_all")
+        freqs_all = load(cv_data_path, "freqs")
+        freqs_unique = unique(freqs_all)
         if normalize_cv
             cv3_avg_freq_norm, cv3_per_mode_norm = load(cv_data_path, "cv3_avg_freq_norm","cv3_per_mode_norm")
             heat_cap_per_mode_scatter(simulation_folder, freqs_all, cv3_per_mode_norm, T, "heat_cap_per_mode_norm")
