@@ -1,4 +1,4 @@
-export NormalModeAnalysis, InstantaneousNormalModeAnalysis
+export NormalModeAnalysis, InstantaneousNormalModeAnalysis, get_modal_data
 
 """
 ModalAnalysis.jl expects the following file structure for a 
@@ -104,7 +104,9 @@ function check_temp(T, T_actual::Float64)
     end
 end
 
-# This function is bottle neck, specifically F3_2_K3
+"""
+Frequencies, eigenvectors, dynamical matrix and MCC3
+"""
 function get_modal_data(ma::ModalAnalysisAlgorithm)
     dynmat = dynamicalMatrix(ma.sys, ma.potential, FC_TOL)
     freqs_sq, phi = get_modes(dynmat)
