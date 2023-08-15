@@ -30,9 +30,8 @@ TEP_path = raw"C:\Users\ejmei\repos\ModalAnalysis.jl\examples\LJ_FCC_4UC\TEP.jld
 kB = ustrip(u"kcal * mol^-1 * K^-1", Unitful.k*Unitful.Na)
 
 # temps = [10,20,30,40,50,60,70,80]
-temps = [10]
-# n_seeds = 10
-n_seeds = 1
+temps = [50,60,70,80]
+n_seeds = 10
 
 total_threads = Threads.nthreads()
 gpu_ids = [0]#CUDA.devices()
