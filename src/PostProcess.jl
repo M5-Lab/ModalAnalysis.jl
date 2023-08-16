@@ -48,14 +48,14 @@ function NM_postprocess(nma::NormalModeAnalysis, kB;
 
     #Save heat capacity data
     if average_identical_freqs
-        jldsave(joinpath(nma.simulation_folder, "cv_data.jld2"), 
+        jldsave(joinpath(nma.simulation_folder, "cv_data.jld2"); 
             cv_total_MD = cv_total_MD, cv_total_MD_norm = cv_total_MD/(N_modes*kB),
             cv3_total = cv3_total, cv3_total_norm = cv3_total/(N_modes*kB),
             cv3_per_mode = cv3_per_mode, cv3_per_mode_norm = cv3_per_mode./kB,
             cv3_avg_freq = cv3_avg_freq, cv3_avg_freq_norm = cv3_avg_freq./kB,
             cv3_cov = cv3_cov, freqs = freqs)
     else
-        jldsave(joinpath(nma.simulation_folder, "cv_data.jld2"), 
+        jldsave(joinpath(nma.simulation_folder, "cv_data.jld2");
         cv_total_MD = cv_total_MD, cv_total_MD_norm = cv_total_MD/(N_modes*kB),
         cv3_total = cv3_total, cv3_total_norm = cv3_total/(N_modes*kB),
         cv3_per_mode = cv3_per_mode, cv3_per_mode_norm = cv3_per_mode./kB,
@@ -153,7 +153,7 @@ function NMA_avg_seeds(basepath, n_seeds, T;
     scatter!(unique_freqs, TEP_cv_per_mode_avg);
     save(joinpath(basepath, "freqs_$(T)K.svg"), f)
 
-    jldsave(joinpath(basepath, "cv_data_averaged.jld2"), cv_MD_total_avg = MD_cv_total_avg,
+    jldsave(joinpath(basepath, "cv_data_averaged.jld2"); cv_MD_total_avg = MD_cv_total_avg,
         MD_cv_total_std_err = MD_cv_total_std_err, TEP_cv_total_avg = TEP_cv_total_avg, TEP_cv_total_std_err = TEP_cv_total_std_err,
         TEP_cv_per_mode_avg = TEP_cv_per_mode_avg, TEP_cv_per_mode_std_err = TEP_cv_per_mode_std_err,
         unique_freqs = unique_freqs, samples_per_freq)
