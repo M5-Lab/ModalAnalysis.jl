@@ -142,7 +142,7 @@ function NMA_avg_seeds(basepath, n_seeds, T;
     #Average heat capacities at each freq
     TEP_cv_per_mode_avg =  mean.(cv3_by_freq)
     #StdErr of heat capacity at each freq
-    TEP_cv_per_mode_std_err = std.(cv3_by_freq)./sqrt.(length.(cv3_by_freq))
+    TEP_cv_per_mode_std_err = std.(cv3_by_freq)./sqrt(n_seeds) #./sqrt.(length.(cv3_by_freq))
     samples_per_freq = length.(cv3_by_freq)
 
     f = Figure()
@@ -156,7 +156,7 @@ function NMA_avg_seeds(basepath, n_seeds, T;
     jldsave(joinpath(basepath, "cv_data_averaged.jld2"); cv_MD_total_avg = MD_cv_total_avg,
         MD_cv_total_std_err = MD_cv_total_std_err, TEP_cv_total_avg = TEP_cv_total_avg, TEP_cv_total_std_err = TEP_cv_total_std_err,
         TEP_cv_per_mode_avg = TEP_cv_per_mode_avg, TEP_cv_per_mode_std_err = TEP_cv_per_mode_std_err,
-        unique_freqs = unique_freqs, samples_per_freq)
+        unique_freqs = unique_freqs, freqs_all = freqs, samples_per_freq = samples_per_freq)
     
 end
 

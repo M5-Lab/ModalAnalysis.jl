@@ -1,9 +1,9 @@
 export run
 
 """
-    run(nma::NormalModeAnalysis, out_path::String)
-    run(nma::NormalModeAnalysis, out_path::String, mcc_block_size::Integer)
-    run(nma::NormalModeAnalysis, out_path::String, TEP_path::String)
+    run(nma::NormalModeAnalysis)
+    run(nma::NormalModeAnalysis, mcc_block_size::Integer)
+    run(nma::NormalModeAnalysis, TEP_path::String)
 """
 
 # Calculate MCC fresh
