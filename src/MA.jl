@@ -1,4 +1,4 @@
-export NormalModeAnalysis, InstantaneousNormalModeAnalysis, get_modal_data
+export NormalModeAnalysis, InstantaneousNormalModeAnalysis, get_modal_data, get_sys
 
 """
 ModalAnalysis.jl expects the following file structure for a 
@@ -35,37 +35,61 @@ function NormalModeAnalysis(simulation_folder, pot, temperature)
     atom_masses, pot_eng_MD, T_avg, eq, ld = parse_simulation_data(simulation_folder)
     eq_pot_eng = parse_eq_energy(simulation_folder)
     check_temp(temperature, T_avg)
+    #T_avg *= unit(temperature)
 
-    @assert issubset(["xu","yu","zu"], eq.header_data["fields"]) "NMA equilibrium data needs xu, yu and zu fields"
+    unrolled_coords = issubset(["xu","yu","zu"], eq.header_data["fields"])
+    normal_coords = issubset(["x","y","z"], eq.header_data["fields"])
+
+    @assert (unrolled_coords || normal_coords) "NMA equilibrium data needs xu, yu and zu or x,y,z fields"
     @assert issubset(["xu","yu","zu"], ld.header_data["fields"]) "NMA dump data needs xu, yu and zu fields"
 
     box_sizes = [ld.header_data["L_x"][2], ld.header_data["L_y"][2], ld.header_data["L_z"][2]]
-    sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "xu", "yu", "zu")
+    if normal_coords
+        sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "x", "y", "z")
+    else
+        sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "xu", "yu", "zu")
+    end
 
-    return NormalModeAnalysis{typeof(temperature), eltype(atom_masses)}(
-        simulation_folder, pot, temperature, atom_masses, pot_eng_MD, eq_pot_eng, eq, ld, sys)
+    return NormalModeAnalysis{typeof(T_avg), eltype(atom_masses)}(
+        simulation_folder, pot, T_avg, atom_masses, pot_eng_MD, eq_pot_eng, eq, ld, sys)
 end
 
-struct InstantaneousNormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm
-    simulation_folder::String
-    potential::Potential
-    temperature::T
-    atom_masses::Vector{M}
-    pot_eng_MD::Vector{Float64}
-    eq::LammpsDump
-    ld::LammpsDump
-    sys::SuperCellSystem
+get_sys(nma::NormalModeAnalysis) = nma.sys
+
+
+mutable struct InstantaneousNormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm
+    const simulation_folder::String
+    const potential::Potential
+    const temperature::T
+    const atom_masses::Vector{M}
+    const pot_eng_MD::Vector{Float64}
+    const ld::LammpsDump
+    reference_sys::SuperCellSystem
 end
 
 function InstantaneousNormalModeAnalysis(simulation_folder, pot, temperature)
     atom_masses, pot_eng_MD, T_avg, eq, ld = parse_simulation_data(simulation_folder)
     check_temp(temperature, T_avg)
+    #T_avg *= unit(temperature)
+
+    @assert issubset(["x","y","z","fx","fy","fz","ix","iy","iz"], ld.header_data["fields"]) "INMA dump data needs x,y,z,fx,fy,fz,ix,iy,iz fields"
 
     box_sizes = [ld.header_data["L_x"][2], ld.header_data["L_y"][2], ld.header_data["L_z"][2]]
     sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "x", "y", "z")
 
-    return InstantaneousNormalModeAnalysis{typeof(temperature), eltype(atom_masses)}(
-        simulation_folder, pot, temperature, atom_masses, pot_eng_MD, eq, ld, sys)
+    return InstantaneousNormalModeAnalysis{typeof(T_avg), eltype(atom_masses)}(
+        simulation_folder, pot, T_avg, atom_masses, pot_eng_MD, ld, sys)
+end
+
+get_sys(inma::InstantaneousNormalModeAnalysis) = inma.reference_sys
+
+"""
+Updates the `reference_sys` parmaater of an `InstantaneousNormalModeAnalysis` object so that
+the positions stored match those in `ld.data_storage`.
+"""
+function update_reference_sys!(inma::InstantaneousNormalModeAnalysis)
+    box_sizes = [inma.ld.header_data["L_x"][2], inma.ld.header_data["L_y"][2], inma.ld.header_data["L_z"][2]]
+    inma.reference_sys = SuperCellSystem(inma.ld.data_storage, inma.atom_masses, box_sizes, "x", "y", "z")
 end
 
 
@@ -108,13 +132,14 @@ end
 Frequencies, eigenvectors, dynamical matrix and MCC3
 """
 function get_modal_data(ma::ModalAnalysisAlgorithm)
-    dynmat = dynamicalMatrix(ma.sys, ma.potential, FC_TOL)
+    s = get_sys(ma)
+    dynmat = dynamicalMatrix(s, ma.potential, FC_TOL)
     freqs_sq, phi = get_modes(dynmat)
 
-    Ψ = third_order_IFC(ma.sys, ma.potential, FC_TOL); #&this probably slows down INMs most
+    Ψ = third_order_IFC(s, ma.potential, FC_TOL); #&this probably slows down INMs most
 
     @info "IFC3 calculation complete"
-    Ψ = mass_weight_third_order!(Ψ, masses(ma.sys)) #&can I make this float32 throughout?
+    Ψ = mass_weight_third_order!(Ψ, masses(s)) #&can I make this float32 throughout?
 
     cuΨ = CuArray{Float32}(Ψ.values); cuPhi = CuArray(Float32.(phi))
     K3 = mcc3(cuΨ, cuPhi, FC_TOL);
@@ -124,12 +149,13 @@ function get_modal_data(ma::ModalAnalysisAlgorithm)
 end
 
 function get_modal_data(ma::ModalAnalysisAlgorithm, mcc_block_size::Integer)
-    dynmat = dynamicalMatrix(ma.sys, ma.potential, FC_TOL)
+    s = get_sys(ma)
+    dynmat = dynamicalMatrix(s, ma.potential, FC_TOL)
     freqs_sq, phi = get_modes(dynmat)
 
-    Ψ = third_order_IFC(ma.sys, ma.potential, FC_TOL);
+    Ψ = third_order_IFC(s, ma.potential, FC_TOL);
     @info "IFC3 calculation complete"
-    Ψ = mass_weight_third_order!(Ψ, masses(ma.sys))
+    Ψ = mass_weight_third_order!(Ψ, masses(s))
 
     cuΨ = CuArray{Float32}(Ψ.values); cuPhi = CuArray{Float32}(phi)
     K3 = mcc3(cuΨ, cuPhi, mcc_block_size, FC_TOL);

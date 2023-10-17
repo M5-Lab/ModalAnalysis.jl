@@ -1,31 +1,39 @@
-export INMA, AbsoluteDistanceMetric, VarianceMetric
+export INMA, AbsoluteDistanceMetric, VarianceMetric, TimestepReset
 
 abstract type DeviationMetric end
 
 struct AbsoluteDistanceMetric <: DeviationMetric
     allowed_absolute_difference::Float64
+    AbsoluteDistanceMetric(aad) = aad <= 0 ? error("Must be positive") : new(aad)
 end
 
-# struct VarianceMetric <: DeviationMetric
-#     allowed_percent_difference::Float64
-#     look_back_period::Int
-#     start_up_time::Int
-#     VarianceMetric(apd, lbp, sut) = (0.0 <= apd <= 100.0) ? error("Not in [0,100]") : new(apd,lbp, sut)
-# end
+struct TimestepReset <: DeviationMetric
+    every_n_steps::Integer
+end
 
-struct SupremumCDFMetric <: DeviationMetric
-    allowed_absolute_difference::Float64
-    initial_steps::Integer #To build distribution
-    SupremumCDFMetric(aad) = (0.0 <= aad <= 1.0) ? error("Not in [0,1]") : new(aad, initial_steps)
+struct LeveneMetric <: DeviationMetric
+    levene_test_pval::Float64
+    initial_steps::Integer
 end
 
 function check_energy_deviation(MD_energy, INM_energy, current_idx, last_reset_idx, dm::AbsoluteDistanceMetric)
     return (abs(MD_energy[current_idx] - INM_energy[current_idx]) > dm.allowed_absolute_difference)
 end
 
-# function check_energy_deviation(MD_energy, INM_energy, current_idx, last_reset_idx, dm::VarianceMetric)
-#     md_
-# end
+function check_energy_deviation(MD_energy, INM_energy, current_idx, last_reset_idx, dm::TimestepReset)
+    return (current_idx - last_reset_idx) >= dm.every_n_steps
+end
+
+
+function check_energy_deviation(MD_energy, INM_energy, current_idx, last_reset_idx, dm::LeveneMetric)
+    if current_idx - last_reset_idx > dm.initial_steps
+        lt = LeveneTest(view(MD_energy, last_reset_idx:current_idx),view(INM_energy, last_reset_idx:current_idx))
+        return pvalue(lt) < dm.levene_test_pval #reject null hypo that var are the same
+    else
+        return false
+    end
+end
+
 
 ###################
 
@@ -34,17 +42,45 @@ end
     run(nma::NormalModeAnalysis, mcc_block_size::Integer, dm::DeviationMetric)
 """
 function run(inma::InstantaneousNormalModeAnalysis, dm::DeviationMetric)
-    dynmat = dynamicalMatrix(inma.sys, inma.potential, FC_TOL)
+    dynmat = dynamicalMatrix(inma.reference_sys, inma.potential, FC_TOL)
     freqs_sq, _ = get_modes(dynmat)
     N_modes = length(freqs_sq)
     INMA_loop(inma, inma.simulation_folder, dm, nothing, N_modes)
 end
 
 function run(inma::InstantaneousNormalModeAnalysis, mcc_block_size::Integer, dm::DeviationMetric)
-    dynmat = dynamicalMatrix(inma.sys, inma.potential, FC_TOL)
+    dynmat = dynamicalMatrix(inma.reference_sys, inma.potential, FC_TOL)
     freqs_sq, _ = get_modes(dynmat)
     N_modes = length(freqs_sq)
     INMA_loop(inma, inma.simulation_folder, dm, mcc_block_size, N_modes)
+end
+
+function calculate_INMs(inma::InstantaneousNormalModeAnalysis, mcc_block_size, mass_sqrt)
+
+    #Update the positions used to calculate force constants
+    update_reference_sys!(inma)
+
+    # Initialize INMs to 3rd Order
+    #TODO write version that keeps K3 on GPU (only possible if it fits)
+    #TODO Re-use K3 storage if it has to go on CPU?
+    if mcc_block_size === nothing
+        freqs_sq, phi, dynmat, K3 = get_modal_data(inma)
+    else
+        freqs_sq, phi, dynmat, K3 = get_modal_data(inma, mcc_block_size)
+    end
+    cuK3 = CuArray{Float32}(K3)
+
+
+    #Set new reference positions to calculate displacements 
+    reference_data = deepcopy(inma.ld.data_storage)
+    # reference_data = zero.(inma.ld.data_storage)
+
+    forces = Matrix(reference_data[!,["fx","fy","fz"]])
+    f0 = reduce(vcat, eachrow(forces) ./ mass_sqrt)
+
+    f0_nmc = (phi') * f0
+
+    return f0_nmc, freqs_sq, phi, cuK3, reference_data
 end
 
 
@@ -56,45 +92,31 @@ function INMA_loop(inma::InstantaneousNormalModeAnalysis, out_path::String,
     #Assumes 3D
     box_sizes = [inma.ld.header_data["L_x"][2],inma.ld.header_data["L_y"][2],inma.ld.header_data["L_z"][2]]
 
+    # Set initial INM state
     recalculate_INMs = true
     recalculation_idxs = [1]
+    reference_idx = 1
 
-    dump_file = open(inma.ld.path, "r")
-    force_cols = [inma.ld.col_idxs["fx"],inma.ld.col_idxs["fy"],inma.ld.col_idxs["fz"]]
-
-    #Pre-allocate
-    f0_nmc = zeros(N_modes)
-    reference_data = nothing
+    #Pre-allocate arrays
     mode_potential_order3 = zeros(N_modes, inma.ld.n_samples)
     total_eng_INM = zeros(inma.ld.n_samples)
     disp = zeros(N_atoms,3)
     disp_mw = zeros(N_modes)
     q = zeros(Float32,N_modes)
     cuQ = CUDA.zeros(N_modes)
- 
-    # phi_global = zeros(N_modes, N_modes) #*REMOVE
-    # freqs_sq_global = zeros(N_modes) #*REMOVE
-    freqs_sq = nothing; phi = nothing; cuK3 = nothing; reference_idx = 1
 
+    dump_file = open(inma.ld.path, "r")
+    f0_nmc, freqs_sq, phi, cuK3, reference_data = nothing, nothing, nothing, nothing, nothing
+
+ 
     recalc_counter = 1
     for i in 1:inma.ld.n_samples
+        #Parse data from dump file into inma.ld.data_storage
         parse_next_timestep!(inma.ld, dump_file)
 
         if recalculate_INMs
-            # Initialize INMs to 3rd Order
-            #TODO write version that keeps K3 on GPU (only possible if it fits)
-            #TODO Re-use K3 storage if it has to go on CPU?
-            if mcc_block_size === nothing
-                freqs_sq, phi, dynmat, K3 = get_modal_data(inma)
-            else
-                freqs_sq, phi, dynmat, K3 = get_modal_data(inma, mcc_block_size)
-            end
-            cuK3 = CuArray{Float32}(K3)
-
-            #Set new reference positions to calculate displacements 
-            reference_data = copy(inma.ld.data_storage) #* need to be deep copy?
-            f0_nmc .= reduce(vcat, eachrow(Matrix(inma.ld.data_storage[!,["fx","fy","fz"]]))./mass_sqrt)
-            f0_nmc = (phi') * f0_nmc
+            #& probably should re-use this storage instead of re-allocating
+            f0_nmc, freqs_sq, phi, cuK3, reference_data = calculate_INMs(inma, mcc_block_size, mass_sqrt) 
 
             recalculate_INMs = false
             reference_idx = i

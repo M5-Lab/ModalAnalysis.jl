@@ -135,8 +135,7 @@ function unwrap_coordinates!(ld::LammpsDump, reference_data::DataFrame, box_size
     ld.data_storage[!, ["ix","iy","iz"]] .-= reference_data[!, ["ix","iy","iz"]]
 
     #Replace coordiantes in ld with un-wrapped coordinates
-    #& CAN I REMOVE THIS COPY : MATRIX() (cant have mis matched column names)
-    ld.data_storage[!, ["x","y","z"]] .+= Matrix(ld.data_storage[!, ["ix","iy","iz"]] .* box_sizes')
+    ld.data_storage[!, ["x","y","z"]] .+= Matrix(ld.data_storage[!, ["ix","iy","iz"]]) .* box_sizes' #* this right?
 
     return ld
 end
