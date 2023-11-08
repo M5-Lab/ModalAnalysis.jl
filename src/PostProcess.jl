@@ -1,7 +1,7 @@
 export NM_postprocess, NMA_avg_seeds, make_plots
 
 function NM_postprocess(nma::NormalModeAnalysis, kB;
-    nthreads::Integer = Threads.nthreads(), average_identical_freqs = true, run_ks_tests = true)
+    nthreads::Integer = Threads.nthreads(), average_identical_freqs = true, run_ks_tests = false)
 
     timer = TimerOutput()
 
@@ -20,7 +20,7 @@ function NM_postprocess(nma::NormalModeAnalysis, kB;
     else
         freqs = sqrt.(freqs_sq)
     end
-    freqs = round.(freqs, sigdigits = 5)
+    freqs = round.(freqs, digits = freq_digits)
 
     #Bulk heat capacities
     cv_total_MD = var(potential_eng_MD)/(kB*T*T)
@@ -162,7 +162,7 @@ end
 
 
 # Makes plots that cannot be made in analysis of MD data due to the non-thread-safe nature of plots in Julia
-function make_plots(simulation_folder::String, T; normalize_cv = true, duplicate_freqs_averaged = true)
+function make_plots(simulation_folder::String, T; normalize_cv = true, average_identical_freqs = true)
 
     mode_energies_path = joinpath(simulation_folder, "ModeEnergies.jld2")
     cv_data_path = joinpath(simulation_folder, "cv_data.jld2")
@@ -172,7 +172,7 @@ function make_plots(simulation_folder::String, T; normalize_cv = true, duplicate
 
     system_energy_hist(simulation_folder, pot_eng_MD, potential_eng_TEP)
 
-    if duplicate_freqs_averaged
+    if average_identical_freqs
         freqs_all = load(cv_data_path, "freqs")
         freqs_unique = unique(freqs_all)
         if normalize_cv
