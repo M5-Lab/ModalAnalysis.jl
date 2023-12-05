@@ -17,6 +17,25 @@ function U_TEP3_n_CUDA(cuF3::CuArray{Float32,3}, cu_u::CuArray{Float32,1})
     return U_n
 end
 
+#Sends chunks of N x N x block_size to GPU to save memory
+# block_size must be a multiple of N
+function U_TEP3_n_CUDA(F3::Array{<:AbstractFloat,3}, cu_u::CuArray{Float32,1}, block_size::Integer)
+    N = size(F3,1)
+    U_n = CUDA.zeros(Float32, N)
+    cuF3 = CUDA.zeros(Float32, N, N, block_size)
+    for i in 1:block_size:N
+        #Move chunk to GPU
+        copyto!(cuF3, F3[:,:,i:i+block_size-1])
+        U_n_view = view(U_n, i:i+block_size-1)
+        @tensor begin
+            U_n_view[n] = cuF3[i,j,n]*cu_u[i]*cu_u[j]
+        end
+    end
+
+    U_n .*= (cu_u./6)
+    return U_n
+end
+
 function U_TEP3_CUDA(cuF3::CuArray{Float32,3}, cu_u::CuArray{Float32,1})
     @tensor begin
         U = cuF3[i,j,k] * cu_u[i] * cu_u[j] * cu_u[k]
