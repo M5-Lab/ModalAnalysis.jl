@@ -1,7 +1,8 @@
 export NM_postprocess, NMA_avg_seeds, make_plots
 
 function NM_postprocess(nma::NormalModeAnalysis, kB;
-    nthreads::Integer = Threads.nthreads(), average_identical_freqs = true, run_ks_tests = false)
+    nthreads::Integer = Threads.nthreads(), average_identical_freqs = true,
+     run_ks_tests = false, freq_digits = 7)
 
     timer = TimerOutput()
 
