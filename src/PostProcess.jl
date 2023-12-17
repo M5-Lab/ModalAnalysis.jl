@@ -13,7 +13,7 @@ function NM_postprocess(nma::NormalModeAnalysis, kB;
     potential_eng_MD, potential_eng_TEP, mode_potential_order3 =
         load(energies_path, "pot_eng_MD", "total_eng_NM", "mode_potential_order3")
     freqs_sq = load(tep_path, "freqs_sq")
-
+ 
     N_modes = length(freqs_sq)
 
     if any(freqs_sq .< 0.0)
@@ -54,13 +54,13 @@ function NM_postprocess(nma::NormalModeAnalysis, kB;
             cv3_total = cv3_total, cv3_total_norm = cv3_total/(N_modes*kB),
             cv3_per_mode = cv3_per_mode, cv3_per_mode_norm = cv3_per_mode./kB,
             cv3_avg_freq = cv3_avg_freq, cv3_avg_freq_norm = cv3_avg_freq./kB,
-            cv3_cov = cv3_cov, freqs = freqs)
+            cv3_cov = cv3_cov, freqs = freqs, cv_TEP_full_dist = cv_TEP_total)
     else
         jldsave(joinpath(nma.simulation_folder, "cv_data.jld2");
         cv_total_MD = cv_total_MD, cv_total_MD_norm = cv_total_MD/(N_modes*kB),
         cv3_total = cv3_total, cv3_total_norm = cv3_total/(N_modes*kB),
         cv3_per_mode = cv3_per_mode, cv3_per_mode_norm = cv3_per_mode./kB,
-        cv3_cov = cv3_cov, freqs = freqs)
+        cv3_cov = cv3_cov, freqs = freqs, cv_TEP_full_dist = cv_TEP_total)
     end
 
     open(joinpath(nma.simulation_folder, "timings.txt"), "a+") do f
@@ -169,7 +169,7 @@ function make_plots(simulation_folder::String, T; normalize_cv = true, average_i
     cv_data_path = joinpath(simulation_folder, "cv_data.jld2")
 
     pot_eng_MD, potential_eng_TEP =
-        load(mode_energies_path, "pot_eng_MD", "total_eng_NM", "mode_potential_order3")
+        load(mode_energies_path, "pot_eng_MD", "total_eng_NM")
 
     system_energy_hist(simulation_folder, pot_eng_MD, potential_eng_TEP)
 
