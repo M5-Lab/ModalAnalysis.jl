@@ -142,7 +142,7 @@ function get_modal_data(ma::ModalAnalysisAlgorithm)
     Ψ = mass_weight_third_order!(Ψ, masses(s)) #&can I make this float32 throughout?
 
     cuΨ = CuArray{Float32}(Ψ.values); cuPhi = CuArray(Float32.(phi))
-    K3 = mcc3(cuΨ, cuPhi, FC_TOL);
+    K3 = mcc3!(cuΨ, cuPhi);
 
     @info "MCC3 calculation complete"
     return freqs_sq, phi, dynmat, K3
@@ -158,7 +158,7 @@ function get_modal_data(ma::ModalAnalysisAlgorithm, mcc_block_size::Integer)
     Ψ = mass_weight_third_order!(Ψ, masses(s))
 
     cuΨ = CuArray{Float32}(Ψ.values); cuPhi = CuArray{Float32}(phi)
-    K3 = mcc3(cuΨ, cuPhi, mcc_block_size, FC_TOL);
+    K3 = mcc3(cuΨ, cuPhi, mcc_block_size);
 
     @info "MCC3 calculation complete"
     return freqs_sq, phi, dynmat, K3
