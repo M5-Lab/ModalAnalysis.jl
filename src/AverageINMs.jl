@@ -1,7 +1,8 @@
 export get_average_INMs
 
 #cannot be parallelized easily with my existing infastructure
-function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceConstantCalculator) where D
+function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceConstantCalculator;
+    verbose::Bool = true) where D
 
     N_modes = D*N_atoms
     avg_psi = zeros(N_modes, N_modes, N_modes)
@@ -10,9 +11,9 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
     
     dump_file = open(inma.ld.path, "r")
 
-    @info "$(inma.ld.n_samples) samples"
+    verbose && @info "$(inma.ld.n_samples) samples"
     for i in 1:inma.ld.n_samples
-        @info "$i"
+        verbose && @info "$i"
         #Parse data from dump file into inma.ld.data_storage
         parse_next_timestep!(inma.ld, dump_file)
     
