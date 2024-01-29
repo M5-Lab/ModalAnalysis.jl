@@ -21,6 +21,7 @@ function run(nma::NormalModeAnalysis)
     end
 
     NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3)
+    return nothing
 end
 
 #Calculate MCC with blocked-approach to save RAM
@@ -38,6 +39,7 @@ function run(nma::NormalModeAnalysis, mcc_block_size::Integer)
     end
 
     NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3)
+    return nothing
 end
 
 #Re-use MCC from a previous simulation
@@ -63,6 +65,7 @@ function run(nma::NormalModeAnalysis, TEP_path::String)
     open(joinpath(nma.simulation_folder, "timings.txt"), "a+") do f
         print_timer(f, timer)
     end
+    return nothing
 end 
 
 #Re-use MCC from a previous simulation, split energy calculation to save GPU memory
@@ -88,6 +91,7 @@ function run(nma::NormalModeAnalysis, TEP_path::String, energy_block_size)
     open(joinpath(nma.simulation_folder, "timings.txt"), "a+") do f
         print_timer(f, timer)
     end
+    return nothing
 end 
 
 function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
@@ -146,6 +150,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
     end
 
     close(dump_file)
+    return nothing
 end
 
 function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, energy_block_size::Integer)
@@ -204,6 +209,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, 
     end
 
     close(dump_file)
+    return nothing
 end
 
 

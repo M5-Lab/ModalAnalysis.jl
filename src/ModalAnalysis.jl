@@ -35,6 +35,6 @@ include("MA.jl")
 include("INMA.jl")
 include("NMA.jl")
 include("PostProcess.jl")
-# include("WorkSplittingStrategies.jl")
+include("AverageINMs.jl")
 
 end
