@@ -5,7 +5,7 @@ function U_TEP_bf(F2, F3, u)
     U2 = 0.5*((transpose(u) * F2) * u) # ~560 μs with 256 atoms
     U3 = zero(U2)
 
-    @turbo for k in eachindex(u)
+    for k in eachindex(u)
         for j in eachindex(u)
             for i in eachindex(u)
                 U3 += F3[i, j, k] * (u[i]*u[j]*u[k])
@@ -21,7 +21,7 @@ function U_TEP3_bf(F3,u)
 
     U3 = 0.0
 
-    @turbo for j in eachindex(u)
+    for j in eachindex(u)
         for i in eachindex(u)
             for k in eachindex(u)
                 U3 += F3[i, j, k] * (u[i]*u[j]*u[k])

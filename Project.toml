@@ -4,7 +4,6 @@ authors = ["Ethan Meitz <emeitz@andrew.cmu.edu>"]
 version = "0.1.0"
 
 [deps]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -15,16 +14,16 @@ HypothesisTests = "09f84164-cd44-5f33-b23f-e6b0d136a0d5"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-LoopVectorization = "bdcacae8-1622-11e9-2a5c-532679323890"
-PlotlyBase = "a03496cd-edff-5a9b-9e67-9cda94a718b5"
-PlotlyKaleido = "f2990250-8cf9-495f-b13a-cce12b45703c"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 TensorOperations = "6aa20fa7-93e2-5fca-9bc0-fbd0db3c71a2"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 cuTENSOR = "011b41b2-24ef-40a8-b3eb-fa098493e9e1"
 
 [compat]
+CUDA = "4,5"
 JLD2 = "0.4.33"
 TensorOperations = "4.0.0"
 julia = "1.8"

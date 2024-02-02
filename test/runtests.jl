@@ -2,6 +2,8 @@ using Test
 using CUDA
 using ModalAnalysis
 
+include("BruteForceTEP.jl")
+
 # Allow CUDA device to be specified
 const DEVICE = get(ENV, "DEVICE", "0")
 run_gpu_tests = false
@@ -81,8 +83,4 @@ end
 
     close(dump_file)
 
-end
-
-@testset "Blocked vs Full GPU" begin
-    #mcc calc, U_n eval
 end

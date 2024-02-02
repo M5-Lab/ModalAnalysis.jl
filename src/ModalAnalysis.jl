@@ -4,7 +4,6 @@ using LinearAlgebra
 using CairoMakie
 using DataFrames
 using TensorOperations
-using LoopVectorization
 using JLD2, CodecZlib
 using StatsBase
 using HypothesisTests
@@ -12,23 +11,18 @@ using CUDA, cuTENSOR
 using DelimitedFiles
 import Images: colorview, Gray, save
 using TimerOutputs
+using Unitful
+using CUDA, cuTENSOR
 
 #TODO: register online
 using ForceConstants
 
 #TODO add thread pinning if on Linux
 
-# Code to evaluate TEP
-module TEP
-    using TensorOperations
-    using ForceConstants
-    using LoopVectorization
-    using CUDA, cuTENSOR
+#Comment out KS test stuff (remove hypo tests, Images)
 
-    include("./TEP/TEP.jl")
-    include("./TEP/BruteForceTEP.jl")
-end
-using .TEP
+# Code to evaluate TEP
+include("./TEP/TEP.jl")
 
 include("DumpParser.jl")
 include("MA.jl")
@@ -36,5 +30,7 @@ include("INMA.jl")
 include("NMA.jl")
 include("PostProcess.jl")
 include("AverageINMs.jl")
+
+include("./workflows/GPU_Job.jl")
 
 end

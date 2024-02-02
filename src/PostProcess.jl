@@ -79,7 +79,7 @@ function build_cov_matrix(per_mode_potential::Matrix, N_modes::Integer, nthreads
     Threads.@threads for thread_id in 1:nthreads
         for n in thread_id:nthreads:N_modes
 
-            cv3_cov[n,n] = @views var(per_mode_potential[:,n])/(kB*T*T)
+            @views cv3_cov[n,n] = var(per_mode_potential[:,n])/(kB*T*T)
 
             #Covariance terms
             for m in range(n+1,N_modes)
