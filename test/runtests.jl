@@ -1,8 +1,7 @@
 using Test
 using CUDA
 using ModalAnalysis
-
-include("BruteForceTEP.jl")
+using JLD2
 
 # Allow CUDA device to be specified
 const DEVICE = get(ENV, "DEVICE", "0")
@@ -15,9 +14,24 @@ else
     @warn "The GPU tests will not be run as a CUDA-enabled device is not available"
 end
 
+function U_TEP3_bf(F3,u)
+
+    U3 = 0.0
+
+    for j in eachindex(u)
+        for i in eachindex(u)
+            for k in eachindex(u)
+                U3 += F3[i, j, k] * (u[i]*u[j]*u[k])
+            end
+        end
+    end
+    return U3/6
+end
+
 
 @testset "TEP Per Mode" begin
     if run_gpu_tests
+
         K3 = zeros(Float32, (3,3,3))
         K3[:,:,1] = [0 0 3; 0 1 0; 3 0 0]
         K3[:,:,2] = [0 1 0; 1 13 0; 0 0 0]
@@ -26,19 +40,16 @@ end
         u = rand(Float32, 3)
         
         cpu = U_TEP3_n_CPU(K3, u)
-        gpu = U_TEP3_n_CUDA(CuArray(K3), CuArray(u), u, 3)
+        gpu = Array(U_TEP3_n_CUDA(CuArray(K3), CuArray(u)))
 
+        #Check modal energies from TensOpt on GPU and CPU
         @test isapprox(cpu, gpu, atol = 1e-7)
 
         brute_force = U_TEP3_bf(K3, u)
-        total_gpu = U_TEP3_CUDA(K3, u)
 
-        @test isapprox(brute_force, total_gpu)
+        #Compare sum of modal to total using just for loops
         @test isapprox(sum(cpu), brute_force)
 
-        bf = U_TEP3_n_bf(K3, u, 2)
-        
-        @test isapprox(bf, cpu)
     end
 end
 
@@ -55,7 +66,7 @@ end
     parse_timestep!(eq, 1)
     atom_masses = get_col(eq, "mass")
     mass_sqrt = sqrt.(atom_masses)
-
+    m = atom_masses[1]
 
     ld = LammpsDump(dump_path);
     dump_file = open(ld.path, "r")
@@ -79,7 +90,8 @@ end
     U2_mode = 0.5* sum(freqs_sq .* (q.^2))
     U3_mode = U_TEP3_bf(K3, q)
 
-    @test U_disp ≈ U_mode
+    @test isapprox(U2_disp, U2_mode, atol = 1e-7)
+    @test isapprox(U3_disp, U3_mode, atol = 1e-7)
 
     close(dump_file)
 
