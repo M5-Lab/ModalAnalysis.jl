@@ -25,8 +25,8 @@ dynamics data was over a set of parameters and will parallelize the calculation 
 - `sim_folder_name::Function ` 
     A function that returns a list of strings given a tempearture, the other parameters and the seed number (`func(temp, params..., seed)`). 
     This strings are joined to `sim_folder` when running NMA via `joinpath`. For example if your seed 0, 10K simulation was in the
-    folder /sim_folder/T_10K/seed0, then calling `sim_folder(10, Dict(), 0)` should return ['T_10K', 'seed0'].
-    Note seeds are generated as zero indexed.
+    folder /sim_folder/T_10K/seed0, then calling `sim_folder(10, 0)` should return ['T_10K', 'seed0']. If there are other params,
+    pass them between the temperature and seed e.g. `sim_folder(10, "N10", 0)`. Note seeds are generated as zero indexed.
 - `tep_file_name::Function`
     A function that returns a string given a temeprature and the other parameters (`func(temp, params...)`).
     This string is appended to `TEP_folder` when running NMA. This could just be the same string for all parameter sets.
@@ -73,10 +73,10 @@ function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::Abst
             #Launch GPU Jobs in Serial
             for (temp, params..., seed) in gpu_job   
                 @info "Starting temperature $(temp), seed $(seed) on GPU $(gpu_id)"
-                seed_path = joinpath(sim_folder, sim_folder_name(params...,seed-1)...)
+                seed_path = joinpath(sim_folder, sim_folder_name(temp, params...,seed-1)...)
     
                 nma = NormalModeAnalysis(seed_path, pot, temp)
-                TEP_path = joinpath(TEP_folder, tep_file_name(params...))
+                TEP_path = joinpath(TEP_folder, tep_file_name(temp, params...))
                 ModalAnalysis.run(nma, TEP_path)
             
                 NM_postprocess(nma, kB; nthreads = threads_per_task, average_identical_freqs = avg_identical_freqs, run_ks_tests = run_ks_tests)
@@ -88,7 +88,7 @@ function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::Abst
     
     @info "Making plots"
     for (temp, params..., seed) in param_combos
-        seed_path = joinpath(sim_folder, sim_folder_name(params...,seed-1))
+        seed_path = joinpath(sim_folder, sim_folder_name(temp, params...,seed-1))
         make_plots(seed_path, temp; average_identical_freqs = avg_identical_freqs)
     end
     
