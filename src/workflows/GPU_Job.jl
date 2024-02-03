@@ -28,15 +28,15 @@ dynamics data was over a set of parameters and will parallelize the calculation 
     folder /sim_folder/T_10K/seed0, then calling `sim_folder(10, Dict(), 0)` should return ['T_10K', 'seed0'].
     Note seeds are generated as zero indexed.
 - `tep_file_name::Function`
-    A function that returns a string given a set of parameters (`func(params...)`). This string is appended to `TEP_folder` when running NMA.
-    This could just be the same string for all parameter sets.
+    A function that returns a string given a temeprature and the other parameters (`func(temp, params...)`).
+    This string is appended to `TEP_folder` when running NMA. This could just be the same string for all parameter sets.
 - `n_seeds::Integer`
     Number of seeds run for each set of parameters. Note that seeds are generated as 0 indexed internally.
 - `pot::Potential`
     Potential used in the simulation
 - `other_params_to_sweep::Dict{String, AbstractVector{<:Real}} = Dict()`
     Dictionary of (non-temperature) parameters to sweep. By default this is Dict().
-- `gpu_ids::CUDA.DeviceIterator = CUDA.devices()`
+- `gpu_ids = CUDA.devices()`
     List of GPU ids to run the NMA on. By default this is CUDA.devices().
 - `ncores::Integer = Threads.nthreads()`
     Number of CPU cores to use. By default this is Threads.nthreads().
@@ -45,7 +45,7 @@ dynamics data was over a set of parameters and will parallelize the calculation 
 """
 function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, tempeartures::AbstractVector{<:Real},
      sim_folder_name::Function, tep_file_name::Function, n_seeds::Integer, pot::Potential; other_params_to_sweep::Dict{String, AbstractVector{<:Real}} = Dict(),
-     gpu_ids::CUDA.DeviceIterator = CUDA.devices(), ncores = Threads.nthreads(), mcc_block_size::Union{Integer, Nothing} = nothing,
+     gpu_ids = CUDA.devices(), ncores = Threads.nthreads(), mcc_block_size::Union{Integer, Nothing} = nothing,
      avg_identical_freqs = false, run_ks_tests = false)
 
     if energy_unit(pot) == u"eV"
