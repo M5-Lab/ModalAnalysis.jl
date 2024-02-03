@@ -43,7 +43,7 @@ dynamics data was over a set of parameters and will parallelize the calculation 
 - `avg_identical_freqs::Bool = false`
     If true, the modal data is geneated with identical freuencies are averaged. By default this is false.
 """
-function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, tempeartures::AbstractVector{<:Real},
+function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::AbstractVector{<:Real},
      sim_folder_name::Function, tep_file_name::Function, n_seeds::Integer, pot::Potential; other_params_to_sweep::Dict{String, AbstractVector{<:Real}} = Dict(),
      gpu_ids = CUDA.devices(), ncores = Threads.nthreads(), mcc_block_size::Union{Integer, Nothing} = nothing,
      avg_identical_freqs = false, run_ks_tests = false)
@@ -59,7 +59,7 @@ function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, tempeartures::Abst
     n_gpus = length(gpu_ids)
     threads_per_task = div(ncores, n_gpus)
 
-    param_combos = Iterators.product(tempeartures, values(other_params_to_sweep)..., 1:n_seeds)
+    param_combos = Iterators.product(temperatures, values(other_params_to_sweep)..., 1:n_seeds)
     gpu_jobs = balanced_partition(collect(param_combos), n_gpus)
 
     @assert length(gpu_jobs) == n_gpus
@@ -92,7 +92,7 @@ function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, tempeartures::Abst
     end
     
     @info "Averaing Seeds"
-    for (temp, p...) in Iterators.product(tempeartures, values(other_params_to_sweep))
+    for (temp, p...) in Iterators.product(temperatures, values(other_params_to_sweep))
         folder_paths = sim_folder_name(temp, p..., 0)
         NMA_avg_seeds(joinpath(base_path, folder_paths[1:end-1]), n_seeds, temp)
     end
