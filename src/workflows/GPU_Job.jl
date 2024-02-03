@@ -44,7 +44,8 @@ dynamics data was over a set of parameters and will parallelize the calculation 
     If true, the modal data is geneated with identical freuencies are averaged. By default this is false.
 """
 function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::AbstractVector{<:Real},
-     sim_folder_name::Function, tep_file_name::Function, n_seeds::Integer, pot::Potential; other_params_to_sweep::Dict{String, AbstractVector{<:Real}} = Dict(),
+     sim_folder_name::Function, tep_file_name::Function, n_seeds::Integer, pot::Potential;
+     other_params_to_sweep::Dict{String, AbstractVector{<:Real}} = Dict{String, AbstractVector{<:Real}}(),
      gpu_ids = CUDA.devices(), ncores = Threads.nthreads(), mcc_block_size::Union{Integer, Nothing} = nothing,
      avg_identical_freqs = false, run_ks_tests = false)
 
