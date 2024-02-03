@@ -74,11 +74,10 @@ function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::Abst
             for (temp, params..., seed) in gpu_job   
                 @info "Starting temperature $(temp), seed $(seed) on GPU $(gpu_id)"
                 seed_path = joinpath(sim_folder, sim_folder_name(temp, params...,seed-1)...)
-    
-                nma = NormalModeAnalysis(seed_path, pot, temp)
                 TEP_path = joinpath(TEP_folder, tep_file_name(temp, params...))
+
+                nma = NormalModeAnalysis(seed_path, pot, temp)
                 ModalAnalysis.run(nma, TEP_path)
-            
                 NM_postprocess(nma, kB; nthreads = threads_per_task, average_identical_freqs = avg_identical_freqs, run_ks_tests = run_ks_tests)
                 GC.gc()
             end
@@ -88,14 +87,14 @@ function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::Abst
     
     @info "Making plots"
     for (temp, params..., seed) in param_combos
-        seed_path = joinpath(sim_folder, sim_folder_name(temp, params...,seed-1))
+        seed_path = joinpath(sim_folder, sim_folder_name(temp, params...,seed-1)...)
         make_plots(seed_path, temp; average_identical_freqs = avg_identical_freqs)
     end
     
     @info "Averaing Seeds"
     for (temp, p...) in Iterators.product(temperatures, values(other_params_to_sweep))
         folder_paths = sim_folder_name(temp, p..., 0)
-        NMA_avg_seeds(joinpath(base_path, folder_paths[1:end-1]), n_seeds, temp)
+        NMA_avg_seeds(joinpath(base_path, folder_paths[1:end-1]...), n_seeds, temp)
     end
 
 end
