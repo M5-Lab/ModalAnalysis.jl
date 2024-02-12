@@ -43,7 +43,14 @@ function U_TEP3_CUDA(cuF3::CuArray{Float32,3}, cu_u::CuArray{Float32,1})
     return U/6
 end
 
-
+# function f(phi, D)
+#     phi_T = transpose(phi)
+#     @tensor begin
+#         res[i,j] := phi_T[i,k]*D[k,l]*phi[l,j]
+#     end
+#     #res should be diagonal
+#     return diag(res)
+# end
 
 ########### TESTING
 
