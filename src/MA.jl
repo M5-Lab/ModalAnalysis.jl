@@ -22,6 +22,7 @@ const global THERMO_NAME::String = "thermo_data.txt"
 
 struct NormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm 
     simulation_folder::String
+    potential::Potential
     temperature::T
     atom_masses::Vector{M}
     pot_eng_MD::Vector{Float64}
@@ -31,7 +32,7 @@ struct NormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm
     sys::SuperCellSystem
 end
 
-function NormalModeAnalysis(simulation_folder, temperature)
+function NormalModeAnalysis(simulation_folder, pot, temperature)
     atom_masses, pot_eng_MD, T_avg, eq, ld = parse_simulation_data(simulation_folder)
     eq_pot_eng = parse_eq_energy(simulation_folder)
     check_temp(temperature, T_avg)
@@ -51,7 +52,7 @@ function NormalModeAnalysis(simulation_folder, temperature)
     end
 
     return NormalModeAnalysis{typeof(T_avg), eltype(atom_masses)}(
-        simulation_folder, T_avg, atom_masses, pot_eng_MD, eq_pot_eng, eq, ld, sys)
+        simulation_folder, pot, T_avg, atom_masses, pot_eng_MD, eq_pot_eng, eq, ld, sys)
 end
 
 get_sys(nma::NormalModeAnalysis) = nma.sys
@@ -59,6 +60,7 @@ get_sys(nma::NormalModeAnalysis) = nma.sys
 
 mutable struct InstantaneousNormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm
     const simulation_folder::String
+    const potential::Potential
     const temperature::T
     const atom_masses::Vector{M}
     const pot_eng_MD::Vector{Float64}
@@ -66,7 +68,7 @@ mutable struct InstantaneousNormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm
     reference_sys::SuperCellSystem
 end
 
-function InstantaneousNormalModeAnalysis(simulation_folder, temperature)
+function InstantaneousNormalModeAnalysis(simulation_folder, pot, temperature)
     atom_masses, pot_eng_MD, T_avg, eq, ld = parse_simulation_data(simulation_folder)
     check_temp(temperature, T_avg)
     #T_avg *= unit(temperature)
@@ -77,7 +79,7 @@ function InstantaneousNormalModeAnalysis(simulation_folder, temperature)
     sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "x", "y", "z")
 
     return InstantaneousNormalModeAnalysis{typeof(T_avg), eltype(atom_masses)}(
-        simulation_folder, T_avg, atom_masses, pot_eng_MD, ld, sys)
+        simulation_folder, pot, T_avg, atom_masses, pot_eng_MD, ld, sys)
 end
 
 get_sys(inma::InstantaneousNormalModeAnalysis) = inma.reference_sys
