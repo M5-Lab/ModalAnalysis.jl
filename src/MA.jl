@@ -66,7 +66,7 @@ mutable struct InstantaneousNormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm
     const atom_masses::Vector{M}
     const pot_eng_MD::Vector{Float64}
     const ld::LammpsDump
-    const ifc_calc::ForceConstantCalculator
+    const calc::ForceConstantCalculator
     reference_sys::SuperCellSystem
 end
 
