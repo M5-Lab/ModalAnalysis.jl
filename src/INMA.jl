@@ -42,17 +42,17 @@ end
     run(nma::NormalModeAnalysis, dm::DeviationMetric)
     run(nma::NormalModeAnalysis, mcc_block_size::Integer, dm::DeviationMetric)
 """
-function run(inma::InstantaneousNormalModeAnalysis, dm::DeviationMetric, calc::ForceConstantCalculator)
-    dynmat = dynamical_matrix(inma.reference_sys, inma.potential, calc)
+function run(inma::InstantaneousNormalModeAnalysis, dm::DeviationMetric)
+    dynmat = dynamical_matrix(inma.reference_sys, inma.potential, inma.calc)
     freqs_sq, _ = get_modes(dynmat)
     N_modes = length(freqs_sq)
     INMA_loop(inma, inma.simulation_folder, dm, nothing, N_modes)
 end
 
 function run(inma::InstantaneousNormalModeAnalysis, mcc_block_size::Integer, 
-    dm::DeviationMetric, calc::ForceConstantCalculator)
-    
-    dynmat = dynamical_matrix(inma.reference_sys, inma.potential, calc)
+    dm::DeviationMetric)
+
+    dynmat = dynamical_matrix(inma.reference_sys, inma.potential, inma.calc)
     freqs_sq, _ = get_modes(dynmat)
     N_modes = length(freqs_sq)
     INMA_loop(inma, inma.simulation_folder, dm, mcc_block_size, N_modes)
