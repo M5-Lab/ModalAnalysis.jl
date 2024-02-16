@@ -29,10 +29,11 @@ struct NormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm
     eq_pot_eng::Float64
     eq::LammpsDump
     ld::LammpsDump
+    calc::Union{Nothing, ForceConstantCalculator}
     sys::SuperCellSystem
 end
 
-function NormalModeAnalysis(simulation_folder, pot, temperature)
+function NormalModeAnalysis(simulation_folder, pot, temperature; calc = nothing)
     atom_masses, pot_eng_MD, T_avg, eq, ld = parse_simulation_data(simulation_folder)
     eq_pot_eng = parse_eq_energy(simulation_folder)
     check_temp(temperature, T_avg)
@@ -52,7 +53,7 @@ function NormalModeAnalysis(simulation_folder, pot, temperature)
     end
 
     return NormalModeAnalysis{typeof(T_avg), eltype(atom_masses)}(
-        simulation_folder, pot, T_avg, atom_masses, pot_eng_MD, eq_pot_eng, eq, ld, sys)
+        simulation_folder, pot, T_avg, atom_masses, pot_eng_MD, eq_pot_eng, eq, ld, calc, sys)
 end
 
 get_sys(nma::NormalModeAnalysis) = nma.sys
@@ -65,10 +66,11 @@ mutable struct InstantaneousNormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm
     const atom_masses::Vector{M}
     const pot_eng_MD::Vector{Float64}
     const ld::LammpsDump
+    const ifc_calc::ForceConstantCalculator
     reference_sys::SuperCellSystem
 end
 
-function InstantaneousNormalModeAnalysis(simulation_folder, pot, temperature)
+function InstantaneousNormalModeAnalysis(simulation_folder, pot, temperature, calc)
     atom_masses, pot_eng_MD, T_avg, eq, ld = parse_simulation_data(simulation_folder)
     check_temp(temperature, T_avg)
     #T_avg *= unit(temperature)
@@ -79,7 +81,7 @@ function InstantaneousNormalModeAnalysis(simulation_folder, pot, temperature)
     sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "x", "y", "z")
 
     return InstantaneousNormalModeAnalysis{typeof(T_avg), eltype(atom_masses)}(
-        simulation_folder, pot, T_avg, atom_masses, pot_eng_MD, ld, sys)
+        simulation_folder, pot, T_avg, atom_masses, pot_eng_MD, ld, calc, sys)
 end
 
 get_sys(inma::InstantaneousNormalModeAnalysis) = inma.reference_sys
@@ -144,10 +146,10 @@ Frequencies, eigenvectors, dynamical matrix and MCC3
 """
 function get_modal_data(ma::ModalAnalysisAlgorithm)
     s = get_sys(ma)
-    dynmat = dynamicalMatrix(s, ma.potential, FC_TOL)
+    dynmat = dynamical_matrix(s, ma.potential, ma.calc)
     freqs_sq, phi = get_modes(dynmat)
 
-    Ψ = third_order_IFC(s, ma.potential, FC_TOL); #&this probably slows down INMs most
+    Ψ = third_order(s, ma.potential, ma.calc); #&this probably slows down INMs most
 
     @info "IFC3 calculation complete"
     Ψ = mass_weight_third_order!(Ψ, masses(s)) #&can I make this float32 throughout?
@@ -161,10 +163,10 @@ end
 
 function get_modal_data(ma::ModalAnalysisAlgorithm, mcc_block_size::Integer)
     s = get_sys(ma)
-    dynmat = dynamicalMatrix(s, ma.potential, FC_TOL)
+    dynmat = dynamical_matrix(s, ma.potential, ma.calc)
     freqs_sq, phi = get_modes(dynmat)
 
-    Ψ = third_order_IFC(s, ma.potential, FC_TOL);
+    Ψ = third_order(s, ma.potential, ma.calc);
     @info "IFC3 calculation complete"
     Ψ = mass_weight_third_order!(Ψ, masses(s))
 

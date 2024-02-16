@@ -9,6 +9,8 @@ export run
 # Calculate MCC fresh
 function run(nma::NormalModeAnalysis)
 
+    @assert nma.calc !== nothing "ForceConstantCalculator not passed to nma class"
+
     # Initialize NMs to 3rd Order
     freqs_sq, phi, dynmat, K3 = get_modal_data(nma)
     
@@ -26,6 +28,8 @@ end
 
 #Calculate MCC with blocked-approach to save RAM
 function run(nma::NormalModeAnalysis, mcc_block_size::Integer)
+
+    @assert nma.calc !== nothing "ForceConstantCalculator not passed to nma class"
 
     # Initialize NMs to 3rd Order
     freqs_sq, phi, dynmat, K3 = get_modal_data(nma, mcc_block_size)
@@ -211,5 +215,4 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, 
     close(dump_file)
     return nothing
 end
-
 

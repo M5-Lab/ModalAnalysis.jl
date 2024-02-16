@@ -26,8 +26,8 @@ include("./TEP/TEP.jl")
 
 include("DumpParser.jl")
 include("MA.jl")
-include("INMA.jl")
 include("NMA.jl")
+include("INMA.jl")
 include("PostProcess.jl")
 include("AverageINMs.jl")
 
