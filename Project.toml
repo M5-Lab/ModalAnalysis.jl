@@ -1,7 +1,7 @@
 name = "ModalAnalysis"
 uuid = "02e10f4e-1d05-11ee-1a7e-43a2532b2fa8"
 authors = ["Ethan Meitz <emeitz@andrew.cmu.edu>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
