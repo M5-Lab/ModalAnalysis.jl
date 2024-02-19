@@ -1,51 +1,37 @@
 export U_TEP3_n_CPU, U_TEP3_n_CUDA, U_TEP3_CUDA,
  TEP_Atomic2, TEP_Modal2, TEP_Atomic3, TEP_Modal3
 
+abstract type Storage end;
+struct GPU_Storage <: Storage end
+struct CPU_Storage <: Storage end
 
 abstract type TaylorEffectivePotential end;
-
-struct TEP_Atomic2{E,L} <: TaylorEffectivePotential
-    F2::SecondOrderForceConstants
+    
+struct TEP_Atomic2{S,E,L} <: TaylorEffectivePotential
+    F2::AbstractArray{AbstractFloat,2}
     energy_unit::E
     length_unit::L
 end
 
-struct TEP_Atomic3{E,L} <: TaylorEffectivePotential
-    F2::SecondOrderForceConstants
-    F3::ThirdOrderForceConstants
+function TEP_Atomic2(F2)
+    F2_storage = (typeof(F2) <: Matrix) ? CPU_Storage : GPU_Storage
+    #TODO
+end
+
+struct TEP_Atomic3{S,E,L} <: TaylorEffectivePotential
+    F2::AbstractArray{AbstractFloat,2}
+    F3::AbstractArray{AbstractFloat,3}
     energy_unit::E
     length_unit::L
 end
 
-struct TEP_Modal2{E,L} <: TaylorEffectivePotential
-    freqs_sq::Vector{AbstractFloat}
-    energy_unit::E
-    length_unit::L
-end
+function TEP_Atomic2(F2, F3)
+    @assert allequal([size(F3); size(F2)]) "F2 and F3 sizes are inconsistent"
 
-#* MAKE TEP2 a field ask about having struct with parametrically defined fields?
-struct TEP_Modal3{E,L} <: TaylorEffectivePotential
-    freqs_sq::Vector{AbstractFloat} 
-    MCC3::ThirdOrderForceConstants
-    energy_unit::E
-    length_unit::L
-end
-
-
-function (tep::TEP_Atomic2)(u::CuArray{Float32,1})
-    #*TODO
-end
-
-function (tep::TEP_Atomic3)(u::CuArray{Float32,1})
-    #*TODO
-end
-
-function (tep::TEP_Modal2)(q::CuArray{Float32,1})
-    #*TODO
-end
-
-function (tep::TEP_Modal3)(q::CuArray{Float32,1})
-    #*TODO
+    F2_storage = (typeof(F2) <: Matrix) ? CPU_Storage : GPU_Storage
+    F3_storage = (typeof(F3) <: Array{T,3} where T) ? CPU_Storage : GPU_Storage
+    @assert F2_storage == F3_storage "Both F2 and F3 must be on CPU or GPU"
+     #TODO
 end
 
 

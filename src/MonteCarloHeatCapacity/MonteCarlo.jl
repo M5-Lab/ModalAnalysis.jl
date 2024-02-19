@@ -20,11 +20,12 @@ end
 
 struct PositionStorage{L}
     r::Vector{Vector{L}}
+    r_uw::Vector{Vector{L}}
     disp::Vector{Vector{L}}
     disp_new::Vector{Vector{L}}
 end
 
-TEP_Atomic_Types = Union{TEP_Atomic2, TEP_Atomic3}
+TEP_Atomic_Types = Union{TEP_Atomic2{CPU_Storage}, TEP_Atomic3{CPU_Storage}}
 function (sim::MC_Simulation)(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, U_current, disp_idxs, ps::PositionStorage) where D
     
     accepted = false
@@ -45,11 +46,11 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, U_
 
     #Update position
     ps.r[i] .+= Δr
-    
+    ps.r_uw[i] .+= Δr
+    ps.disp_new[i] .+= Δr
+
     #Enforce PBC
     ps.r[i] = enforce_cell_size!(ps.r[i], sys.box_sizes_SC)
-
-    ps.disp_new[i] .+= Δr
 
     #Get energy contribution of atom j at its new position
     delta_U = ΔU_TEP_atomic(tep.F2, tep.F3, disp_idxs..., ps.disp, ps.disp_new)
@@ -65,6 +66,7 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, U_
             U_current += delta_U
         else # rejected
             ps.r[i] .-= Δr
+            ps.r_uw[i] .-= Δr
             ps.disp_new[i] .-= Δr
         end
     end
@@ -74,15 +76,61 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, U_
     return ps, U_current, accepted
 end
 
+function save_unwrapped_coords(ps::PositionStorage, outpath, idx)
+    jldopen(joinpath(outpath, "mc_unwrapped_coords.jld2"), "a+") do file
+        file["r_uw$(idx)"] = ps.r_uw
+    end
+end
+
 function (sim::MC_Simulation)(sys::SuperCellSystem{D}, pot::Potential, U_current, disp_idxs, ps::PositionStorage) where D
-#TODO copy version that works for LJ from old code
+    # #TODO copy version that works for LJ from old code
+    # normal_dist = Normal(0,ustrip(sim.step_size_std))
+        
+    # #Pick a random particle to perturb
+    # j = sample(1:sys.n_particles) #*always allocates?
+
+    # #Save its position incase peturbation is rejected
+    # r_temp = deepcopy(position(sys, j)) #*always allocates
+    # r_temp_uw = deepcopy(unwrapped_position(sys,j))
+
+    # #Update position and get new contribution
+    # Δr = rand(normal_dist,3)*length_unit(pot)
+    # update_position(sys, j, position(sys, j) .+ Δr)
+    # update_unwrapped_position(sys, j, unwrapped_position(sys, j) .+ Δr)
+
+    # #Enforce PBC
+    # enforceCellSize!(sys)
+
+    # #Get energy contribution of atom j at its new position
+    # U_new = ΔU_TEP_atomic(F2, F3, iα, iβ, iγ, disp_last, disp_current)
+    # delta_U = U_new - atom_energies[j]
+
+    # if delta_U < 0*zero(pot.ϵ)
+    #     U_total += delta_U
+    #     atom_energies[j] += delta_U
+    #     accepted = true
+    # else
+    #     p_accept = exp(-beta*delta_U)
+    #     accept_move = sample([false,true], ProbabilityWeights([1 - p_accept, p_accept]))
+    #     if accept_move
+    #         accepted = true
+    #         U_total += delta_U
+    #         atom_energies[j] += delta_U
+    #     else # rejected
+    #         update_position(sys, j, r_temp)
+    #         update_unwrapped_position(sys, j, r_temp_uw)
+    #     end
+    # end
+
+    # return sys, U_total, atom_energies, accepted, j
 end
 
 #Generate configurations, energies are calculate with atom-based TEP
-function runMC!(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, sim::MC_Simulation, outpath) where D
+function run(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, sim::MC_Simulation, outpath) where D
 
     #Create copies of positions that I can modify freely
-    r = deepcopy(position(sys))
+    r = deepcopy(positions(sys))
+    #* INIT R_ UW
     u = r .- sim.reference_positions
     ps = PositionStorage(r, u, deepcopy(u))
 
@@ -100,18 +148,15 @@ function runMC!(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, sim::MC_Simulati
     U_arr = zeros(sim.n_steps)*energy_unit(tep)
     U_arr[1] = U_current
 
-    jldopen(joinpath(outpath, "MonteCarloDisplacements.jld2"), "a+") do file
-        file["r_uw1"] = ps.r_uw
-    end
+    save_unwrapped_coords(ps, outpath, 1)
 
     for idx in range(2,sim.n_steps)
         ps, U_arr[idx], accepted = sim(sys, tep, U_arr[idx-1], disp_idxs, ps)
         num_accepted += accepted
 
         #* check if this is bottleneck, could write every N steps to disk at cost of memory
-        jldopen(joinpath(outpath, "MonteCarloDisplacements.jld2"), "a+") do file
-            file["disp$(idx)"] = ps.disp
-        end
+        #* Could make separate channel/thread and copy data there. 
+        save_unwrapped_coords(ps, outpath, idx)
     end
 
     return U_arr, num_accepted
