@@ -6,23 +6,32 @@ using DataFrames
 using TensorOperations
 using JLD2, CodecZlib
 using StatsBase
-using HypothesisTests
 using CUDA, cuTENSOR
 using DelimitedFiles
-import Images: colorview, Gray, save
 using TimerOutputs
 using Unitful
-using CUDA, cuTENSOR
+using TensorOperations
+using ThreadPinning
+pinthreads(:cores)
+
+
+#If add KS test back need HypothesisTests, Images
 
 #TODO: register online
 using ForceConstants
 
-#TODO add thread pinning if on Linux
+module TEP
+    include("./TEP/TEP.jl")
+    include("./TEP/DeltaTEP.jl")
+end
+using .TEP
 
-#Comment out KS test stuff (remove hypo tests, Images)
+#* CAN THIS BE PACKAGE EXTENSION?? SEPARATE PACKAGE ENTIRELY?
+module MonteCarloHeatCapacity
+    include("./MonteCarloHeatCapacity/MonteCarlo.jl")
+end
+using .MonteCarloHeatCapacity
 
-# Code to evaluate TEP
-include("./TEP/TEP.jl")
 
 include("DumpParser.jl")
 include("MA.jl")

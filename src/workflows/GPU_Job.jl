@@ -47,7 +47,7 @@ function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::Abst
      sim_folder_name::Function, tep_file_name::Function, n_seeds::Integer, pot::Potential;
      other_params_to_sweep::Dict{String, AbstractVector{<:Real}} = Dict{String, AbstractVector{<:Real}}(),
      gpu_ids = CUDA.devices(), ncores = Threads.nthreads(), mcc_block_size::Union{Integer, Nothing} = nothing,
-     avg_identical_freqs = false, run_ks_tests = false)
+     avg_identical_freqs = false)
 
     if energy_unit(pot) == u"eV"
         kB = ustrip(u"eV/K", Unitful.k)
@@ -78,7 +78,7 @@ function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::Abst
 
                 nma = NormalModeAnalysis(seed_path, pot, temp)
                 ModalAnalysis.run(nma, TEP_path)
-                NM_postprocess(nma, kB; nthreads = threads_per_task, average_identical_freqs = avg_identical_freqs, run_ks_tests = run_ks_tests)
+                NM_postprocess(nma, kB; nthreads = threads_per_task, average_identical_freqs = avg_identical_freqs)
                 GC.gc()
             end
             nothing

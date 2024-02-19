@@ -1,8 +1,7 @@
 export NM_postprocess, NMA_avg_seeds, make_plots
 
-function NM_postprocess(nma::NormalModeAnalysis, kB;
-    nthreads::Integer = Threads.nthreads(), average_identical_freqs = true,
-     run_ks_tests = false, freq_digits = 7)
+function NM_postprocess(nma::NormalModeAnalysis, kB; nthreads::Integer = Threads.nthreads(),
+     average_identical_freqs = true, freq_digits = 7)
 
     timer = TimerOutput()
 
@@ -45,7 +44,7 @@ function NM_postprocess(nma::NormalModeAnalysis, kB;
         @warn "Sum of modal heat capacities ($(cv3_total)) does not match heat capacity from total TEP energy ($(cv_TEP_total))"
     end
 
-    run_ks_tests && @timeit timer "KS Tests" run_ks_experiments(nma.simulation_folder, N_modes)
+    # run_ks_tests && @timeit timer "KS Tests" run_ks_experiments(nma.simulation_folder, N_modes)
 
     #Save heat capacity data
     if average_identical_freqs
@@ -222,63 +221,63 @@ function heat_cap_per_mode_scatter(simulation_folder::String, freqs, cv3_per_mod
 end
 
 # #############################################
-"""
- -α: p-value required to reject null-hypothesis
- -n_experiments: Number of times to randomly sample a pair of two distributions
- -n_samples_per_hist: Number of samples taken in each experiment (with replacement)
- -required_pass_rate: Pair of histograms is deemed the same if this many pairs of KS test fail to reject H₀
-"""
-function run_ks_experiments(simulation_folder::String, N_modes::Integer;
-     α = 0.05, n_experiments = 20, required_pass_rate = 0.5, n_samples_per_hist = 10000)
-    energy_path = joinpath(simulation_folder, "ModeEnergies.jld2")
+# """
+#  -α: p-value required to reject null-hypothesis
+#  -n_experiments: Number of times to randomly sample a pair of two distributions
+#  -n_samples_per_hist: Number of samples taken in each experiment (with replacement)
+#  -required_pass_rate: Pair of histograms is deemed the same if this many pairs of KS test fail to reject H₀
+# """
+# function run_ks_experiments(simulation_folder::String, N_modes::Integer;
+#      α = 0.05, n_experiments = 20, required_pass_rate = 0.5, n_samples_per_hist = 10000)
+#     energy_path = joinpath(simulation_folder, "ModeEnergies.jld2")
 
-    energies_order3 = load(energy_path, "mode_potential_order3");
+#     energies_order3 = load(energy_path, "mode_potential_order3");
 
-    p_val_matrix = zeros(N_modes, N_modes)
-    D_matrix = zeros(N_modes, N_modes)
-    pass_matrix = zeros(N_modes, N_modes)
+#     p_val_matrix = zeros(N_modes, N_modes)
+#     D_matrix = zeros(N_modes, N_modes)
+#     pass_matrix = zeros(N_modes, N_modes)
 
-    Threads.@threads for i in range(1, N_modes)
-        sample1_storage = zeros(n_samples_per_hist)
-        sample2_storage = zeros(n_samples_per_hist)
-        for j in range(i, N_modes)
-            isSameDist, avg_p_val, avg_δ = @views ks_experiment(energies_order3[i,:], energies_order3[j,:], 
-                sample1_storage, sample2_storage, n_experiments, required_pass_rate, α)
-            p_val_matrix[i,j] = avg_p_val
-            p_val_matrix[j,i] = p_val_matrix[i,j]
-            D_matrix[i,j] = avg_δ
-            D_matrix[j,i] = avg_δ
-            pass_matrix[i,j] = isSameDist
-            pass_matrix[j,i] = isSameDist
-        end
-    end
+#     Threads.@threads for i in range(1, N_modes)
+#         sample1_storage = zeros(n_samples_per_hist)
+#         sample2_storage = zeros(n_samples_per_hist)
+#         for j in range(i, N_modes)
+#             isSameDist, avg_p_val, avg_δ = @views ks_experiment(energies_order3[i,:], energies_order3[j,:], 
+#                 sample1_storage, sample2_storage, n_experiments, required_pass_rate, α)
+#             p_val_matrix[i,j] = avg_p_val
+#             p_val_matrix[j,i] = p_val_matrix[i,j]
+#             D_matrix[i,j] = avg_δ
+#             D_matrix[j,i] = avg_δ
+#             pass_matrix[i,j] = isSameDist
+#             pass_matrix[j,i] = isSameDist
+#         end
+#     end
 
-    save(joinpath(simulation_folder, "ks_p_val_matrix.png"), colorview(Gray, p_val_matrix))
-    save(joinpath(simulation_folder, "ks_pass_matrix.png"), colorview(Gray, pass_matrix))
-    save(joinpath(simulation_folder, "ks_dist_matrix.png"), colorview(Gray, D_matrix))
+#     save(joinpath(simulation_folder, "ks_p_val_matrix.png"), colorview(Gray, p_val_matrix))
+#     save(joinpath(simulation_folder, "ks_pass_matrix.png"), colorview(Gray, pass_matrix))
+#     save(joinpath(simulation_folder, "ks_dist_matrix.png"), colorview(Gray, D_matrix))
 
-end
+# end
 
 
 
-function ks_experiment(data1, data2, sample1_storage, sample2_storage, n_experiments, required_pass_rate, α)
-    n_same_dist = 0
-    p_vals = zeros(n_experiments)
-    δs = zeros(n_experiments)
-    for i in 1:n_experiments
-        sample1_storage = sample!(data1, sample1_storage)
-        sample2_storage = sample!(data2, sample2_storage)
-        ks_res = ApproximateTwoSampleKSTest(sample1_storage, sample2_storage)
-        p_value = pvalue(ks_res)
-        p_vals[i] = p_value
-        δs[i] = ks_res.δ
-        if p_value > α #fail to reject null --> same distributions
-            n_same_dist += 1
-        end
-    end
+# function ks_experiment(data1, data2, sample1_storage, sample2_storage, n_experiments, required_pass_rate, α)
+#     n_same_dist = 0
+#     p_vals = zeros(n_experiments)
+#     δs = zeros(n_experiments)
+#     for i in 1:n_experiments
+#         sample1_storage = sample!(data1, sample1_storage)
+#         sample2_storage = sample!(data2, sample2_storage)
+#         ks_res = ApproximateTwoSampleKSTest(sample1_storage, sample2_storage)
+#         p_value = pvalue(ks_res)
+#         p_vals[i] = p_value
+#         δs[i] = ks_res.δ
+#         if p_value > α #fail to reject null --> same distributions
+#             n_same_dist += 1
+#         end
+#     end
 
-    return ((n_same_dist/n_experiments) > required_pass_rate), sum(p_vals)/n_experiments, sum(δs)/n_experiments
-end
+#     return ((n_same_dist/n_experiments) > required_pass_rate), sum(p_vals)/n_experiments, sum(δs)/n_experiments
+# end
 
 ### Bin energies
 
@@ -307,12 +306,12 @@ end
 # end
 
 
-function resample_CLT(energy)
-    N_steps = length(energy)
-    N_samples = N_steps ÷ 10
-    M = 500
-    energy_samples = sample(energy,(N_samples,M))
-    energy_samples = mean(energy_samples,dims = 2)
+# function resample_CLT(energy)
+#     N_steps = length(energy)
+#     N_samples = N_steps ÷ 10
+#     M = 500
+#     energy_samples = sample(energy,(N_samples,M))
+#     energy_samples = mean(energy_samples,dims = 2)
 
-    return M, energy_samples
-end
+#     return M, energy_samples
+# end
