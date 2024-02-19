@@ -96,7 +96,7 @@ end
 
 
 function ΔU_TEP_atomic(F2::Array{T,2}, F3::Array{T,3}, iα, iβ, iγ, u_last, u_current) where T
-    Δu = u_current .- u_last
+    Δu = u_current .- u_last #& allocation
     return ΔU2(F2, u_last, iα, iβ, iγ, Δu[[iα,iβ,iγ]]...) + ΔU3(F3, u_last, u_current, Δu, iα, iβ, iγ)
 end
 

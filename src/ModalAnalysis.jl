@@ -6,12 +6,13 @@ using DataFrames
 using TensorOperations
 using JLD2, CodecZlib
 using StatsBase
-using CUDA, cuTENSOR
+using CUDA
 using DelimitedFiles
 using TimerOutputs
 using Unitful
-using TensorOperations
+
 using ThreadPinning
+ThreadPinning.Prefs.set_os_warning(false)
 pinthreads(:cores)
 
 
@@ -21,6 +22,11 @@ pinthreads(:cores)
 using ForceConstants
 
 module TEP
+    using ForceConstants
+    using TensorOperations
+    using CUDA, cuTENSOR
+    using LoopVectorization
+
     include("./TEP/TEP.jl")
     include("./TEP/DeltaTEP.jl")
 end
@@ -28,6 +34,9 @@ using .TEP
 
 #* CAN THIS BE PACKAGE EXTENSION?? SEPARATE PACKAGE ENTIRELY?
 module MonteCarloHeatCapacity
+    using ForceConstants
+    using Distributions
+    using ..TEP
     include("./MonteCarloHeatCapacity/MonteCarlo.jl")
 end
 using .MonteCarloHeatCapacity
@@ -40,6 +49,6 @@ include("INMA.jl")
 include("PostProcess.jl")
 include("AverageINMs.jl")
 
-include("./workflows/GPU_Job.jl")
+include("./workflows/GPU_NMA_Job.jl")
 
 end

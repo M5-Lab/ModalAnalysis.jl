@@ -1,33 +1,50 @@
-export U_TEP3_n_CPU, U_TEP3_n_CUDA, U_TEP3_CUDA, TEP_Atomic2, TEP_Modal2, TEP_Atomic3, TEP_Modal3
+export U_TEP3_n_CPU, U_TEP3_n_CUDA, U_TEP3_CUDA,
+ TEP_Atomic2, TEP_Modal2, TEP_Atomic3, TEP_Modal3
 
 
 abstract type TaylorEffectivePotential end;
 
-struct TEP_Atomic2 <: TaylorEffectivePotential
+struct TEP_Atomic2{E,L} <: TaylorEffectivePotential
     F2::SecondOrderForceConstants
+    energy_unit::E
+    length_unit::L
 end
 
-struct TEP_Atomic3 <: TaylorEffectivePotential
+struct TEP_Atomic3{E,L} <: TaylorEffectivePotential
     F2::SecondOrderForceConstants
     F3::ThirdOrderForceConstants
+    energy_unit::E
+    length_unit::L
 end
 
-struct TEP_Modal2 <: TaylorEffectivePotential
+struct TEP_Modal2{E,L} <: TaylorEffectivePotential
     freqs_sq::Vector{AbstractFloat}
+    energy_unit::E
+    length_unit::L
 end
 
 #* MAKE TEP2 a field ask about having struct with parametrically defined fields?
-struct TEP_Modal3 <: TaylorEffectivePotential
+struct TEP_Modal3{E,L} <: TaylorEffectivePotential
     freqs_sq::Vector{AbstractFloat} 
     MCC3::ThirdOrderForceConstants
+    energy_unit::E
+    length_unit::L
 end
 
 
-function (tep::TEP_Atomic)(u::CuArray{Float32,1})
+function (tep::TEP_Atomic2)(u::CuArray{Float32,1})
     #*TODO
 end
 
-function (tep::TEP_Modal)(q::CuArray{Float32,1})
+function (tep::TEP_Atomic3)(u::CuArray{Float32,1})
+    #*TODO
+end
+
+function (tep::TEP_Modal2)(q::CuArray{Float32,1})
+    #*TODO
+end
+
+function (tep::TEP_Modal3)(q::CuArray{Float32,1})
     #*TODO
 end
 

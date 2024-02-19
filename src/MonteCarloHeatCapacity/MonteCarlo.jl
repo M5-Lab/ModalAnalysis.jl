@@ -1,160 +1,176 @@
-struct MC_Simulation{S,T}
+struct MC_Simulation{S,L,T,B}
     n_steps::Int
     n_steps_equilibrate::Int
     step_size_std::S
+    reference_positions::Union{Vector{Vector{L}} , Nothing}
     temp::T
+    beta::B
 end
 
-#Generate configurations, energies are calculate with atom-based TEP
-#* CAN I MAKE THIS GENERICALLY WORK FOR TEP 2 OR 3???
-function runMC!(sys::System{D}, tep::TEP_Atomic{3}, sim::MC_Simulation, pot::Potential) where D
-
-    beta = 1/(sys.kB*sim.temp)
-
-    #Equilibrate System
-    U_current = 0.0*energy_unit(pot)
-    for i in range(1,sim.n_steps_equilibrate)
-        sys, U_current, _, _ = monte_carlo_step!(sys, U_current, beta, pot, sim)
+function MC_Simulation(n_steps::Int, n_steps_equilibrate::Int, step_size_std, temp, kB; reference_positions = nothing)
+    beta = 1/(kB*temp)
+    if reference_positions !== nothing
+        L = eltype(reference_positions[1])
+    else
+        L = Nothing
     end
-    @info "Equilibration complete"
-
-    num_accepted = 0
-    U_arr = zeros(sim.n_steps)*energy_unit(pot)
-    U_TEP_atomic2 = zeros(sim.n_steps)*energy_unit(pot)
-    U_TEP_atomic3 = zeros(sim.n_steps)*energy_unit(pot)
-
-    #Set Initial Values
-    U_arr[1] = U_current
-    U_TEP_atomic2[1] = U_current
-    U_TEP_atomic3[1] = U_current
-
-    #Initial displacements
-    u_last = zeros(D*sys.n_particles)*length_unit(pot)
-    disp_idxs = zeros(D)*length_unit(pot)
-    for idx in range(2,sim.n_steps)
-
-        #Update positions with MonteCarlo
-        sys, U_current, accepted, particle_idx = monte_carlo_step!(sys, U_current, beta, pot, sim)
-        num_accepted += accepted
-
-        U_arr[idx] = U_current
-
-        if accepted
-            #1D index of displacements
-            disp_idxs[1] = D*(particle_idx - 1) + 1
-            disp_idxs[2] = D*(particle_idx - 1) + 2
-            disp_idxs[3] = D*(particle_idx - 1) + 3
-
-            #Calculate energy from TEP in real space
-            u_current = displacement_1D(sys) #uses unwrapped coordinates
-            Δu = u_current[disp_idxs] .- u_last[disp_idxs]
-
-            ΔU_atomic2 = ΔU_TEP_atomic2(fc_data.F2, disp_idxs..., ustrip.(u_last), ustrip.(Δu)...) * energy_unit(pot) 
-            ΔU_atomic3 = ΔU_TEP_atomic3(fc_data.F2, fc_data.F3, disp_idxs...,
-                    ustrip.(u_last), ustrip.(u_current)) * energy_unit(pot)
-
-            U_TEP_atomic2[idx] = U_TEP_atomic2[idx-1] + ΔU_atomic2
-            U_TEP_atomic3[idx] = U_TEP_atomic3[idx-1] + ΔU_atomic3
-
-            u_last = u_current
-        else
-            U_TEP_atomic2[idx] = U_TEP_atomic2[idx-1]
-            U_TEP_atomic3[idx] = U_TEP_atomic3[idx-1]
-        end
-    end
-
-    return U_arr, U_TEP_atomic2, U_TEP_atomic3, U_TEP_modal, num_accepted
+    return MC_Simulation{typeof(step_size_std),L , typeof(temp), typeof(beta)}(
+        n_steps, n_steps_equilibrate, step_size_std, reference_positions, temp, beta)
 end
 
-#Makes use of global variable kB
-function monte_carlo_step!(sys::System{D}, U_total, atom_energies, beta, sim::MC_Simulation) where D
+struct PositionStorage{L}
+    r::Vector{Vector{L}}
+    disp::Vector{Vector{L}}
+    disp_new::Vector{Vector{L}}
+end
+
+TEP_Atomic_Types = Union{TEP_Atomic2, TEP_Atomic3}
+function (sim::MC_Simulation)(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, U_current, disp_idxs, ps::PositionStorage) where D
+    
     accepted = false
 
     #Distribution of possible step sizes
     normal_dist = Normal(0,ustrip(sim.step_size_std))
 
     #Pick a random particle to perturb
-    j = sample(1:sys.n_particles) #*always allocates?
+    i = sample(1:sys.n_particles)
 
-    #Save its position incase peturbation is rejected
-    r_temp = deepcopy(position(sys, j)) #*always allocates
-    r_temp_uw = deepcopy(unwrapped_position(sys,j))
+    #1D index of displacements
+    disp_idxs[1] = D*(i - 1) + 1
+    disp_idxs[2] = D*(i - 1) + 2
+    disp_idxs[3] = D*(i - 1) + 3
 
-    #Update position and get new contribution
+    #Generate random pertubation in x,y,z
     Δr = rand(normal_dist,3)*length_unit(pot)
-    update_position(sys, j, position(sys, j) .+ Δr)
-    update_unwrapped_position(sys, j, unwrapped_position(sys, j) .+ Δr)
 
+    #Update position
+    ps.r[i] .+= Δr
+    
     #Enforce PBC
-    enforceCellSize!(sys)
+    ps.r[i] = enforce_cell_size!(ps.r[i], sys.box_sizes_SC)
+
+    ps.disp_new[i] .+= Δr
 
     #Get energy contribution of atom j at its new position
-    U_new = ΔU_TEP_atomic(F2, F3, iα, iβ, iγ, disp_last, disp_current)
-    delta_U = U_new - atom_energies[j]
+    delta_U = ΔU_TEP_atomic(tep.F2, tep.F3, disp_idxs..., ps.disp, ps.disp_new)
 
     if delta_U < 0*zero(pot.ϵ)
-        U_total += delta_U
-        atom_energies[j] += delta_U
+        U_current += delta_U
         accepted = true
     else
-        p_accept = exp(-beta*delta_U)
+        p_accept = exp(-sim.beta*delta_U)
         accept_move = sample([false,true], ProbabilityWeights([1 - p_accept, p_accept]))
         if accept_move
             accepted = true
-            U_total += delta_U
-            atom_energies[j] += delta_U
+            U_current += delta_U
         else # rejected
-            update_position(sys, j, r_temp)
-            update_unwrapped_position(sys, j, r_temp_uw)
+            ps.r[i] .-= Δr
+            ps.disp_new[i] .-= Δr
         end
     end
 
-    return sys, U_total, atom_energies, accepted, j
+    ps.disp .= ps.disp_new
+
+    return ps, U_current, accepted
 end
 
+function (sim::MC_Simulation)(sys::SuperCellSystem{D}, pot::Potential, U_current, disp_idxs, ps::PositionStorage) where D
+#TODO copy version that works for LJ from old code
+end
+
+#Generate configurations, energies are calculate with atom-based TEP
+function runMC!(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, sim::MC_Simulation, outpath) where D
+
+    #Create copies of positions that I can modify freely
+    r = deepcopy(position(sys))
+    u = r .- sim.reference_positions
+    ps = PositionStorage(r, u, deepcopy(u))
+
+    disp_idxs = zeros(D)*length_unit(tep)
+
+    #Equilibrate System
+    U_current = 0.0*energy_unit(tep)
+    for _ in range(1,sim.n_steps_equilibrate)
+        ps, U_current, _ = sim(sys, tep, U_current, disp_idxs, ps)
+    end
+    @info "Equilibration complete"
+
+    #Set values for sampling run
+    num_accepted = 0
+    U_arr = zeros(sim.n_steps)*energy_unit(tep)
+    U_arr[1] = U_current
+
+    jldopen(joinpath(outpath, "MonteCarloDisplacements.jld2"), "a+") do file
+        file["r_uw1"] = ps.r_uw
+    end
+
+    for idx in range(2,sim.n_steps)
+        ps, U_arr[idx], accepted = sim(sys, tep, U_arr[idx-1], disp_idxs, ps)
+        num_accepted += accepted
+
+        #* check if this is bottleneck, could write every N steps to disk at cost of memory
+        jldopen(joinpath(outpath, "MonteCarloDisplacements.jld2"), "a+") do file
+            file["disp$(idx)"] = ps.disp
+        end
+    end
+
+    return U_arr, num_accepted
+end
+
+
+#Energy change when single atom is moved
+function U_single(r, pot::PairPotential, box_sizes, j::Int)
+    U = zero(pot.ϵ)
+
+    r_ij = zeros(length(box_sizes))*length_unit(pot)
+    r_cut_sq = pot.r_cut*pot.r_cut
+    for i in range(1,n_particles(sys))           
+        if i != j
+            #Vector between particle i and j
+            r_ij .= r[i] .- r[j]
+
+            nearest_mirror!(r_ij, box_sizes)
+            dist_sq = dot(r_ij, r_ij)
+            
+            #Make sure mirrored particle is in cuttoff
+            if dist_sq < r_cut_sq
+                U += potential(pot, sqrt(dist_sq))
+            end
+        end
+    end
+    
+    return U
+end
+
+function U_single(r, pot::StillingerWeberSilicon, box_sizes, j::Int)
+    #TODO
+end
 
 ### Functions to Enfroce PBC ###
 
-function nearest_mirror(r_ij,L)
-    r_x = r_ij[1]; r_y = r_ij[2]; r_z = r_ij[3]
-
-    if r_x > L/2
-        r_x = r_x - L
-    elseif r_x < -L/2
-        r_x = r_x + L
+function nearest_mirror!(r_ij, box_sizes)
+    for i in eachindex(box_sizes)  
+        if r_ij[i] > box_sizes[i]/2
+            r_ij[i] -= box_sizes[i]
+        elseif r_ij[i] < -box_sizes[i]/2
+            r_ij[i] += box_sizes[i]
+        end
     end
-
-    if r_y > L/2
-        r_y = r_y - L
-    elseif r_y < -L/2
-        r_y = r_y + L  
-    end
-
-    if r_z > L/2
-        r_z = r_z - L
-    elseif r_z < -L/2
-        r_z = r_z + L
-    end
-
-    return [r_x,r_y,r_z] 
+    
+    return r_ij
 end
                                              
-function enforceCellSize!(sys::System)
 
-    L = sys.box_size
-    for i in eachindex(sys)
-        r_x, r_y, r_z = position(sys,i)
+function enforce_cell_size!(r, box_sizes)
 
-        if r_x < zero(r_x) || r_x > L
-            r_x = r_x - sign(r_x)*L
-        elseif  r_y < zero(r_y) || r_y > L
-            r_y = r_y - sign(r_y)*L
-        elseif  r_z < zero(r_z) || r_z > L
-            r_z = r_z - sign(r_z)*L
-        end
-
-        update_position(sys, i, [r_x, r_y, r_z])
-        # sys.coords[i,:] = [r_x,r_y,r_z]
+    if r[1] < zero(r[1]) || r[1] > box_sizes[1]
+        r[1] = r[1] - sign(r[1])*box_sizes[1]
+    elseif  r[2] < zero(r[2]) || r[2] > box_sizes[2]
+        r[2] = r[2] - sign(r[2])*box_sizes[2]
+    elseif  r[3] < zero(r[3]) || r[3] > box_sizes[3]
+        r[3] = r[3] - sign(r[3])*box_sizes[3]
     end
+
+   return r
 
 end
