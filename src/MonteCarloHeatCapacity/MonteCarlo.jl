@@ -6,7 +6,8 @@ struct MC_Simulation{S,T}
 end
 
 #Generate configurations, energies are calculate with atom-based TEP
-function runMC!(sys::System{D}, tep::TEP_Atomic, sim::MC_Simulation, pot::Potential) where D
+#* CAN I MAKE THIS GENERICALLY WORK FOR TEP 2 OR 3???
+function runMC!(sys::System{D}, tep::TEP_Atomic{3}, sim::MC_Simulation, pot::Potential) where D
 
     beta = 1/(sys.kB*sim.temp)
 
