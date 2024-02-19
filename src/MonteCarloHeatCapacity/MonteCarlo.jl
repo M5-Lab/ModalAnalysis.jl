@@ -6,13 +6,12 @@ struct MC_Simulation{S,T}
 end
 
 #Generate configurations, energies are calculate with atom-based TEP
-function runMC!(fc_data::ForceConstantData, dynmat_data::DynamicalMatrix,
-    sys::System{D}, sim::MC_Simulation, pot::Potential) where D
+function runMC!(sys::System{D}, tep::TEP_Atomic, sim::MC_Simulation, pot::Potential) where D
 
     beta = 1/(sys.kB*sim.temp)
 
     #Equilibrate System
-    U_current = zero(pot.ϵ)
+    U_current = 0.0*energy_unit(pot)
     for i in range(1,sim.n_steps_equilibrate)
         sys, U_current, _, _ = monte_carlo_step!(sys, U_current, beta, pot, sim)
     end

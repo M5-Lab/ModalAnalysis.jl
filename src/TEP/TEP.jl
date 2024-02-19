@@ -1,5 +1,24 @@
 export U_TEP3_n_CPU, U_TEP3_n_CUDA, U_TEP3_CUDA
 
+
+abstract type TEP{O} end;
+
+struct TEP_Atomic{O} <: TEP{O}
+    F2::SecondOrderForceConstants
+    F3::ThirdOrderForceConstants
+end
+
+struct TEP_Modal{O} <: TEP{O}
+    freqs_sq::Vector{AbstractFloat}
+    F3::ThirdOrderForceConstants
+end
+
+
+function (tep::TEP_atomic)(u::AbstractVector{<:AbstractFloat})
+    #*TODO
+end
+
+
 function U_TEP3_n_CPU(F3::Array{T,3}, u) where T
     @tensor begin
         U_n[n] := F3[j,k,n]*u[j]*u[k]
