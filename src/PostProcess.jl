@@ -26,7 +26,7 @@ function NM_postprocess(nma::NormalModeAnalysis, kB; nthreads::Integer = Threads
     cv_total_MD = var(potential_eng_MD)/(kB*T*T)
     cv_TEP_total = var(potential_eng_TEP)/(kB*T*T)
 
-    @timeit timer "Cov Matrix" cv3_cov, cv3_per_mode, cv3_total = 
+    cv3_cov, cv3_per_mode, cv3_total = 
         build_cov_matrix(mode_potential_order3, N_modes, nthreads, kB, T)
 
 
@@ -44,7 +44,7 @@ function NM_postprocess(nma::NormalModeAnalysis, kB; nthreads::Integer = Threads
         @warn "Sum of modal heat capacities ($(cv3_total)) does not match heat capacity from total TEP energy ($(cv_TEP_total))"
     end
 
-    # run_ks_tests && @timeit timer "KS Tests" run_ks_experiments(nma.simulation_folder, N_modes)
+    # run_ks_tests && run_ks_experiments(nma.simulation_folder, N_modes)
 
     #Save heat capacity data
     if average_identical_freqs

@@ -87,7 +87,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, 
 
     for i in 1:nma.ld.n_samples
 
-        parse_next_timestep!(current_positions, nma, dump_file, posn_cols)
+        parse_next_timestep!(current_positions, nma.ld, dump_file, posn_cols)
         
         #Calculate displacements
         disp .= current_positions .- initial_positions

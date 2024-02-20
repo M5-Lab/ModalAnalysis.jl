@@ -1,3 +1,5 @@
+export MC_Simulation, runMC
+
 struct MC_Simulation{S,L,T,B}
     n_steps::Int
     n_steps_equilibrate::Int
@@ -21,7 +23,7 @@ struct PositionStorage{L}
     disp_new::Vector{Vector{L}}
 end
 
-function save_data(ps::PositionStorage, outpath, idx, ::Val(:NMA))
+function save_data(ps::PositionStorage, outpath, idx, ::Val{:NMA})
     jldopen(joinpath(outpath, "mc_unwrapped_coords.jld2"), "a+") do file
         file["r_uw$(idx)"] = DataFrame(xu = view(ps.r_uw, :, 1),
                                        yu = view(ps.r_uw, :, 2),
@@ -29,7 +31,7 @@ function save_data(ps::PositionStorage, outpath, idx, ::Val(:NMA))
     end
 end
 
-function save_data(ps::PositionStorage, outpath, idx, ::Val(:INMA))
+function save_data(ps::PositionStorage, outpath, idx, ::Val{:INMA})
     error("Not implemented yet")
 end
 
@@ -155,7 +157,7 @@ function runMC(sys::SuperCellSystem{D}, TEP_path::String, sim::MC_Simulation, ou
     U_arr = zeros(sim.n_steps)*energy_unit
     U_arr[1] = U_current
 
-    save_data(ps, outpath, 1, Val(output_type))
+    save_data(ps, outpath, 1, Val{output_type})
 
     for idx in range(2,sim.n_steps)
         ps, U_arr[idx], accepted = sim(sys, F2, F3, U_arr[idx-1], disp_idxs, ps)
@@ -163,7 +165,7 @@ function runMC(sys::SuperCellSystem{D}, TEP_path::String, sim::MC_Simulation, ou
 
         #* check if this is bottleneck, could write every N steps to disk at cost of memory
         #* Could make separate channel/thread and copy data there. 
-        save_data(ps, outpath, idx, Val(output_type))
+        save_data(ps, outpath, idx, Val{output_type})
     end
 
     return U_arr, num_accepted
