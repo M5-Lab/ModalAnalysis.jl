@@ -8,7 +8,6 @@ using JLD2, CodecZlib
 using StatsBase
 using CUDA
 using DelimitedFiles
-using TimerOutputs
 using Unitful
 
 using ThreadPinning

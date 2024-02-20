@@ -1,18 +1,21 @@
 export run
 
 """
-    run(nma::NormalModeAnalysis)
-    run(nma::NormalModeAnalysis, mcc_block_size::Integer)
-    run(nma::NormalModeAnalysis, TEP_path::String)
+    run(nma::NormalModeAnalysis, mcc_block_size::Integer = nothing)
+    run(nma::NormalModeAnalysis, TEP_path::String, energy_block_size::Integer = nothing)
 """
 
 # Calculate MCC fresh
-function run(nma::NormalModeAnalysis)
+function run(nma::NormalModeAnalysis, mcc_block_size::Union{Integer, Nothing} = nothing)
 
     @assert nma.calc !== nothing "ForceConstantCalculator not passed to nma class"
 
     # Initialize NMs to 3rd Order
-    freqs_sq, phi, dynmat, K3 = get_modal_data(nma)
+    if mcc_block_size === nothing
+        freqs_sq, phi, dynmat, K3 = get_modal_data(nma)
+    else
+        freqs_sq, phi, dynmat, K3 = get_modal_data(nma, mcc_block_size)
+    end
     
     #Save mode data
     jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w"; compress = true) do file
@@ -22,32 +25,15 @@ function run(nma::NormalModeAnalysis)
         file["dynmat"] = dynmat.values
     end
 
-    NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3)
+    NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3, U_TEP3_n_CUDA)
+
     return nothing
 end
 
-#Calculate MCC with blocked-approach to save RAM
-function run(nma::NormalModeAnalysis, mcc_block_size::Integer)
-
-    @assert nma.calc !== nothing "ForceConstantCalculator not passed to nma class"
-
-    # Initialize NMs to 3rd Order
-    freqs_sq, phi, dynmat, K3 = get_modal_data(nma, mcc_block_size)
-    
-    #Save mode data
-    jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w"; compress = true) do file
-        file["freqs_sq"] = freqs_sq
-        file["phi"] = phi
-        file["K3"] = K3
-        file["dynmat"] = dynmat.values
-    end
-
-    NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3)
-    return nothing
-end
 
 #Re-use MCC from a previous simulation
-function run(nma::NormalModeAnalysis, TEP_path::String)
+function run(nma::Union{NormalModeAnalysis, MonteCarloNormalModeAnalysis},
+     TEP_path::String, energy_block_size::Union{Integer, Nothing} = nothing)
     
     f = jldopen(TEP_path, "r"; parallel_read = true)
     freqs_sq = f["freqs_sq"]
@@ -63,49 +49,26 @@ function run(nma::NormalModeAnalysis, TEP_path::String)
         file["dynmat"] = dynmat
     end
 
-    timer = TimerOutput()
-    @timeit timer "NMA_loop" NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3)
-
-    open(joinpath(nma.simulation_folder, "timings.txt"), "a+") do f
-        print_timer(f, timer)
+    if energy_block_size === nothing
+        NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3, U_TEP3_n_CUDA)
+    else
+        U_TEP3_function = (cuK3, cuQ) -> U_TEP3_n_CUDA(cuK3, cuQ, energy_block_size)
+        NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3, U_TEP3_function)
     end
+
+
     return nothing
 end 
 
-#Re-use MCC from a previous simulation, split energy calculation to save GPU memory
-function run(nma::NormalModeAnalysis, TEP_path::String, energy_block_size)
-    
-    f = jldopen(TEP_path, "r"; parallel_read = true)
-    freqs_sq = f["freqs_sq"]
-    phi = f["phi"]
-    K3 = f["K3"]
-    dynmat = f["dynmat"]
-    close(f)
 
-    #Always save a copy of freqs and phi for post processing stuff
-    jldopen(joinpath(nma.simulation_folder, "TEP.jld2"), "w") do file
-        file["freqs_sq"] = freqs_sq
-        file["phi"] = phi
-        file["dynmat"] = dynmat
-    end
-
-    timer = TimerOutput()
-    @timeit timer "NMA_loop" NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3, energy_block_size)
-
-    open(joinpath(nma.simulation_folder, "timings.txt"), "a+") do f
-        print_timer(f, timer)
-    end
-    return nothing
-end 
-
-function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
+function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, U_TEP3_func::Function)
 
     N_modes = length(freqs_sq)
     N_atoms = length(nma.atom_masses)
 
     mass_sqrt = sqrt.(nma.atom_masses)
 
-    K3 = Float32.(K3) #TODO MAKE TYPE A PARAMETER FOR MCC3 TO SAVE TIME CASTING (matters more for INMS)
+    K3 = Float32.(K3)
     cuK3 = CUDA.CuArray(K3)
     
     #Pre-allocate intermediate data_storage
@@ -124,7 +87,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
 
     for i in 1:nma.ld.n_samples
 
-        parse_next_timestep!(current_positions, nma.ld, dump_file, posn_cols)
+        parse_next_timestep!(current_positions, nma, dump_file, posn_cols)
         
         #Calculate displacements
         disp .= current_positions .- initial_positions
@@ -137,34 +100,30 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3)
         copyto!(cuQ, q)
 
         #Calculate energy from INMs at timestep i
-        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_n_CUDA(cuK3, cuQ)) #&slowest step, can I make TensorOpt faster? just do on CPU
+        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_func(cuK3, cuQ)) #&slowest step, can I make TensorOpt faster? just do on CPU
         total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + nma.eq_pot_eng
     end 
 
-    timer2 = TimerOutput()
-
-    @timeit timer2 "Energy Write" jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w"; compress = true) do file
+    jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w"; compress = true) do file
         file["mode_potential_order3"] = mode_potential_order3
         file["total_eng_NM"] = total_eng_NM
         file["pot_eng_MD"] = nma.pot_eng_MD
     end
 
-    open(joinpath(nma.simulation_folder, "timings.txt"), "a+") do f
-        print_timer(f, timer2)
-    end
 
     close(dump_file)
     return nothing
 end
 
-function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, energy_block_size::Integer)
+
+function NMA_loop(nma::MonteCarloNormalModeAnalysis, out_path::String, freqs_sq, phi, K3, U_TEP3_func::Function)
 
     N_modes = length(freqs_sq)
     N_atoms = length(nma.atom_masses)
 
     mass_sqrt = sqrt.(nma.atom_masses)
 
-    K3 = Float32.(K3) #TODO MAKE TYPE A PARAMETER FOR MCC3 TO SAVE TIME CASTING (matters more for INMS)
+    K3 = Float32.(K3)
     cuK3 = CUDA.CuArray(K3)
     
     #Pre-allocate intermediate data_storage
@@ -172,18 +131,16 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, 
     q = zeros(Float32,N_modes)
     cuQ = CUDA.zeros(N_modes)
 
-    dump_file = open(nma.ld.path, "r")
-    posn_cols = [nma.ld.col_idxs["xu"],nma.ld.col_idxs["yu"],nma.ld.col_idxs["zu"]]
-    initial_positions = Matrix(nma.eq.data_storage[!, ["xu","yu","zu"]])
+    initial_positions = Matrix(nma.sim.reference_positions)
     current_positions = zeros(size(initial_positions))
     
     #Pre-allocate output arrays
-    mode_potential_order3 = zeros(N_modes, nma.ld.n_samples)
-    total_eng_NM = zeros(nma.ld.n_samples)
+    mode_potential_order3 = zeros(N_modes, sim.n_steps)
+    total_eng_NM = zeros(sim.n_steps)
 
-    for i in 1:nma.ld.n_samples
+    for i in 1:sim.n_steps
 
-        parse_next_timestep!(current_positions, nma.ld, dump_file, posn_cols)
+        parse_next_timestep!(current_positions, nma, dump_file, posn_cols)
         
         #Calculate displacements
         disp .= current_positions .- initial_positions
@@ -196,23 +153,19 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, 
         copyto!(cuQ, q)
 
         #Calculate energy from INMs at timestep i
-        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_n_CUDA(cuK3, cuQ, energy_block_size)) #&slowest step, can I make TensorOpt faster? just do on CPU
-        total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + nma.eq_pot_eng
-    end 
+        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_func(cuK3, cuQ))
+        total_eng_NM[i] = @views sum(mode_potential_order3[:,i])
+    end
 
-    timer2 = TimerOutput()
+    #* total_eng_NM SHOULD MATCH MONTE CARLO ENERGY EXACTLY!
+    #* CHECK THIS
 
-    @timeit timer2 "Energy Write" jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w"; compress = true) do file
+    jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w"; compress = true) do file
         file["mode_potential_order3"] = mode_potential_order3
         file["total_eng_NM"] = total_eng_NM
         file["pot_eng_MD"] = nma.pot_eng_MD
     end
 
-    open(joinpath(nma.simulation_folder, "timings.txt"), "a+") do f
-        print_timer(f, timer2)
-    end
-
-    close(dump_file)
     return nothing
 end
 

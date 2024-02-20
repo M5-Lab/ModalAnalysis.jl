@@ -1,37 +1,42 @@
 struct MC_Simulation{S,L,T,B}
     n_steps::Int
     n_steps_equilibrate::Int
-    step_size_std::S
-    reference_positions::Union{Vector{Vector{L}} , Nothing}
+    sampling_dist::Normal
+    initial_posns::Vector{Vector{L}}
     temp::T
     beta::B
 end
 
-function MC_Simulation(n_steps::Int, n_steps_equilibrate::Int, step_size_std, temp, kB; reference_positions = nothing)
+function MC_Simulation(n_steps::Int, n_steps_equilibrate::Int, step_size_std, temp, kB; initial_posns)
     beta = 1/(kB*temp)
-    if reference_positions !== nothing
-        L = eltype(reference_positions[1])
-    else
-        L = Nothing
-    end
-    return MC_Simulation{typeof(step_size_std),L , typeof(temp), typeof(beta)}(
-        n_steps, n_steps_equilibrate, step_size_std, reference_positions, temp, beta)
+    sampling_dist =  Normal(0,ustrip(sim.step_size_std))
+    return MC_Simulation{typeof(step_size_std), eltype(initial_posns[1]), typeof(temp), typeof(beta)}(
+        n_steps, n_steps_equilibrate, sampling_dist, initial_posns, temp, beta)
 end
 
 struct PositionStorage{L}
     r::Vector{Vector{L}}
-    r_uw::Vector{Vector{L}}
+    r_uw::Matrix{L}
     disp::Vector{Vector{L}}
     disp_new::Vector{Vector{L}}
 end
 
-TEP_Atomic_Types = Union{TEP_Atomic2{CPU_Storage}, TEP_Atomic3{CPU_Storage}}
-function (sim::MC_Simulation)(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, U_current, disp_idxs, ps::PositionStorage) where D
+function save_data(ps::PositionStorage, outpath, idx, ::Val(:NMA))
+    jldopen(joinpath(outpath, "mc_unwrapped_coords.jld2"), "a+") do file
+        file["r_uw$(idx)"] = DataFrame(xu = view(ps.r_uw, :, 1),
+                                       yu = view(ps.r_uw, :, 2),
+                                       zu = view(ps.r_uw, :, 3))
+    end
+end
+
+function save_data(ps::PositionStorage, outpath, idx, ::Val(:INMA))
+    error("Not implemented yet")
+end
+
+function (sim::MC_Simulation)(sys::SuperCellSystem{D}, F2::Array{T,2}, F3::Array{T,3},
+     U_current, disp_idxs, ps::PositionStorage) where {D,T}
     
     accepted = false
-
-    #Distribution of possible step sizes
-    normal_dist = Normal(0,ustrip(sim.step_size_std))
 
     #Pick a random particle to perturb
     i = sample(1:sys.n_particles)
@@ -42,18 +47,18 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, U_
     disp_idxs[3] = D*(i - 1) + 3
 
     #Generate random pertubation in x,y,z
-    Δr = rand(normal_dist,3)*length_unit(pot)
+    Δr = rand(sim.sampling_dist,3)*length_unit(pot)
 
     #Update position
     ps.r[i] .+= Δr
-    ps.r_uw[i] .+= Δr
+    ps.r_uw[i,:] .+= Δr
     ps.disp_new[i] .+= Δr
 
     #Enforce PBC
     ps.r[i] = enforce_cell_size!(ps.r[i], sys.box_sizes_SC)
 
     #Get energy contribution of atom j at its new position
-    delta_U = ΔU_TEP_atomic(tep.F2, tep.F3, disp_idxs..., ps.disp, ps.disp_new)
+    delta_U = ΔU_TEP_atomic(F2, F3, disp_idxs..., ps.disp, ps.disp_new)
 
     if delta_U < 0*zero(pot.ϵ)
         U_current += delta_U
@@ -66,7 +71,7 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, U_
             U_current += delta_U
         else # rejected
             ps.r[i] .-= Δr
-            ps.r_uw[i] .-= Δr
+            ps.r_uw[i,:] .-= Δr
             ps.disp_new[i] .-= Δr
         end
     end
@@ -74,12 +79,6 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, U_
     ps.disp .= ps.disp_new
 
     return ps, U_current, accepted
-end
-
-function save_unwrapped_coords(ps::PositionStorage, outpath, idx)
-    jldopen(joinpath(outpath, "mc_unwrapped_coords.jld2"), "a+") do file
-        file["r_uw$(idx)"] = ps.r_uw
-    end
 end
 
 function (sim::MC_Simulation)(sys::SuperCellSystem{D}, pot::Potential, U_current, disp_idxs, ps::PositionStorage) where D
@@ -126,37 +125,45 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, pot::Potential, U_current
 end
 
 #Generate configurations, energies are calculate with atom-based TEP
-function run(sys::SuperCellSystem{D}, tep::TEP_Atomic_Types, sim::MC_Simulation, outpath) where D
+function runMC(sys::SuperCellSystem{D}, TEP_path::String, sim::MC_Simulation, outpath, output_type;
+     F2_name::String = "F2", F3_name::String = "F3") where D
+
+    N_atoms = n_atoms(sys)
+
+    F2, F3 = load(TEP_path, F2_name, F3_name)
+
+    energy_unit = 
+    length_unit = unit(position(sys,1,1))
 
     #Create copies of positions that I can modify freely
     r = deepcopy(positions(sys))
-    #* INIT R_ UW
-    u = r .- sim.reference_positions
-    ps = PositionStorage(r, u, deepcopy(u))
+    r_uw = permutedims(reshape(deepcopy(r), (D, N_atoms)), (2,1))
+    u = zeros(size(r))
+    ps = PositionStorage(r, r_uw, u, deepcopy(u))
 
-    disp_idxs = zeros(D)*length_unit(tep)
+    disp_idxs = zeros(D)*length_unit
 
     #Equilibrate System
-    U_current = 0.0*energy_unit(tep)
+    U_current = 0.0*energy_unit
     for _ in range(1,sim.n_steps_equilibrate)
-        ps, U_current, _ = sim(sys, tep, U_current, disp_idxs, ps)
+        ps, U_current, _ = sim(sys, F2, F3, U_current, disp_idxs, ps)
     end
     @info "Equilibration complete"
 
     #Set values for sampling run
     num_accepted = 0
-    U_arr = zeros(sim.n_steps)*energy_unit(tep)
+    U_arr = zeros(sim.n_steps)*energy_unit
     U_arr[1] = U_current
 
-    save_unwrapped_coords(ps, outpath, 1)
+    save_data(ps, outpath, 1, Val(output_type))
 
     for idx in range(2,sim.n_steps)
-        ps, U_arr[idx], accepted = sim(sys, tep, U_arr[idx-1], disp_idxs, ps)
+        ps, U_arr[idx], accepted = sim(sys, F2, F3, U_arr[idx-1], disp_idxs, ps)
         num_accepted += accepted
 
         #* check if this is bottleneck, could write every N steps to disk at cost of memory
         #* Could make separate channel/thread and copy data there. 
-        save_unwrapped_coords(ps, outpath, idx)
+        save_data(ps, outpath, idx, Val(output_type))
     end
 
     return U_arr, num_accepted

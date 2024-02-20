@@ -95,33 +95,33 @@ end
 """
 Parse next timestep from `io` and stores it in `ld`. 
 """
-function parse_next_timestep!(ld::LammpsDump, io::IOStream)
+function parse_next_timestep!(nma::NormalModeAnalysis, io::IOStream)
     
     #Skip header 
-    for _ in range(1, ld.header_length) readline(io) end
+    for _ in range(1, nma.ld.header_length) readline(io) end
 
     #Parse atom data
-    for j in range(1, ld.header_data["N_atoms"])
-        ld.data_storage[j,:] .= parse.(Float64, split(strip(readline(io))))
+    for j in range(1, nma.ld.header_data["N_atoms"])
+        nma.ld.data_storage[j,:] .= parse.(Float64, split(strip(readline(io))))
     end
 
-    return ld, io
+    return nma, io
 
 end
 
 """
 Parse `cols` of next timestep from `io` associated with `ld`. Output stored in `out`. 
 """
-function parse_next_timestep!(out::Matrix{T}, ld::LammpsDump, io::IOStream, cols::Vector{<:Integer}) where T
+function parse_next_timestep!(out::Matrix{T}, nma::NormalModeAnalysis, io::IOStream, cols::Vector{<:Integer}) where T
     #Skip header 
-    for _ in range(1, ld.header_length) readline(io) end
+    for _ in range(1, nma.ld.header_length) readline(io) end
 
     #Parse atom data
-    for j in range(1, ld.header_data["N_atoms"])
+    for j in range(1, nma.ld.header_data["N_atoms"])
         out[j,:] .= parse.(T, split(strip(readline(io)))[cols])
     end
 
-    return out, ld, io
+    return out, nma, io
 end
 
 """
