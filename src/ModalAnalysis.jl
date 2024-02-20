@@ -31,10 +31,13 @@ module TEP
 end
 using .TEP
 
-#* CAN THIS BE PACKAGE EXTENSION?? SEPARATE PACKAGE ENTIRELY?
 module MonteCarloHeatCapacity
     using ForceConstants
     using Distributions
+    using Unitful
+    using StatsBase
+    using DataFrames
+    using JLD2
     using ..TEP
     include("./MonteCarloHeatCapacity/MonteCarlo.jl")
 end
@@ -49,5 +52,6 @@ include("PostProcess.jl")
 include("AverageINMs.jl")
 
 include("./workflows/GPU_NMA_Job.jl")
+include("./workflows/MonteCarloJob.jl")
 
 end

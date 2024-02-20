@@ -9,30 +9,39 @@ struct MC_Simulation{S,L,T,B}
     beta::B
 end
 
-function MC_Simulation(n_steps::Int, n_steps_equilibrate::Int, step_size_std, temp, kB; initial_posns)
+function MC_Simulation(n_steps::Int, n_steps_equilibrate::Int, step_size_std, temp, kB, initial_posns)
     beta = 1/(kB*temp)
-    sampling_dist =  Normal(0,ustrip(sim.step_size_std))
+    sampling_dist =  Normal(0,ustrip(step_size_std))
     return MC_Simulation{typeof(step_size_std), eltype(initial_posns[1]), typeof(temp), typeof(beta)}(
         n_steps, n_steps_equilibrate, sampling_dist, initial_posns, temp, beta)
 end
 
-struct PositionStorage{L}
+struct PositionStorage{L,U}
     r::Vector{Vector{L}}
     r_uw::Matrix{L}
-    disp::Vector{Vector{L}}
-    disp_new::Vector{Vector{L}}
+    disp::Vector{U}
+    disp_new::Vector{U}
+    r_uw_out::Array{L,3}
 end
 
-function save_data(ps::PositionStorage, outpath, idx, ::Val{:NMA})
+function save_data(ps::PositionStorage, outpath, idx_rng::UnitRange, ::Val{:NMA})
     jldopen(joinpath(outpath, "mc_unwrapped_coords.jld2"), "a+") do file
-        file["r_uw$(idx)"] = DataFrame(xu = view(ps.r_uw, :, 1),
-                                       yu = view(ps.r_uw, :, 2),
-                                       zu = view(ps.r_uw, :, 3))
+        for k in range(1, length(idx_rng))
+            file["r_uw$(idx_rng[k])"] = DataFrame(xu = view(ps.r_uw_out, :, 1, k),
+                                                  yu = view(ps.r_uw_out, :, 2, k),
+                                                  zu = view(ps.r_uw_out, :, 3, k))
+        end
     end
 end
 
 function save_data(ps::PositionStorage, outpath, idx, ::Val{:INMA})
     error("Not implemented yet")
+end
+
+function calculate_save_interlval(N_atoms, D, T, allowed_mem_GB = 0.5)
+    nbytes_per_step = N_atoms*D*sizeof(T)
+    nGB_per_step = nbytes_per_step/(1024^3)
+    return floor(Int,allowed_mem_GB/nGB_per_step)
 end
 
 function (sim::MC_Simulation)(sys::SuperCellSystem{D}, F2::Array{T,2}, F3::Array{T,3},
@@ -41,7 +50,7 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, F2::Array{T,2}, F3::Array
     accepted = false
 
     #Pick a random particle to perturb
-    i = sample(1:sys.n_particles)
+    i = sample(1:n_atoms(sys))
 
     #1D index of displacements
     disp_idxs[1] = D*(i - 1) + 1
@@ -49,20 +58,20 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, F2::Array{T,2}, F3::Array
     disp_idxs[3] = D*(i - 1) + 3
 
     #Generate random pertubation in x,y,z
-    Δr = rand(sim.sampling_dist,3)*length_unit(pot)
+    Δr = rand(sim.sampling_dist,3)
 
     #Update position
     ps.r[i] .+= Δr
     ps.r_uw[i,:] .+= Δr
-    ps.disp_new[i] .+= Δr
+    ps.disp_new[disp_idxs] .+= Δr
 
     #Enforce PBC
-    ps.r[i] = enforce_cell_size!(ps.r[i], sys.box_sizes_SC)
+    ps.r[i] = enforce_cell_size!(ps.r[i], ustrip.(sys.box_sizes_SC))
 
     #Get energy contribution of atom j at its new position
     delta_U = ΔU_TEP_atomic(F2, F3, disp_idxs..., ps.disp, ps.disp_new)
 
-    if delta_U < 0*zero(pot.ϵ)
+    if delta_U < 0
         U_current += delta_U
         accepted = true
     else
@@ -74,7 +83,7 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, F2::Array{T,2}, F3::Array
         else # rejected
             ps.r[i] .-= Δr
             ps.r_uw[i,:] .-= Δr
-            ps.disp_new[i] .-= Δr
+            ps.disp_new[disp_idxs] .-= Δr
         end
     end
 
@@ -134,19 +143,18 @@ function runMC(sys::SuperCellSystem{D}, TEP_path::String, sim::MC_Simulation, ou
 
     F2, F3 = load(TEP_path, F2_name, F3_name)
 
-    energy_unit = 
-    length_unit = unit(position(sys,1,1))
-
     #Create copies of positions that I can modify freely
-    r = deepcopy(positions(sys))
-    r_uw = permutedims(reshape(deepcopy(r), (D, N_atoms)), (2,1))
-    u = zeros(size(r))
-    ps = PositionStorage(r, r_uw, u, deepcopy(u))
+    r = ustrip.(deepcopy(ustrip.(positions(sys))))
+    r_uw = permutedims(reshape(deepcopy(reduce(vcat,r)), (D, N_atoms)), (2,1))
+    u = zeros(D*N_atoms)
 
-    disp_idxs = zeros(D)*length_unit
+    save_interval = calculate_save_interlval(N_atoms, D, typeof(r_uw[1,1]))
+    ps = PositionStorage(r, r_uw, u, deepcopy(u), zeros(size(r_uw)..., save_interval))
+
+    disp_idxs = zeros(Int64, D)
 
     #Equilibrate System
-    U_current = 0.0*energy_unit
+    U_current = 0.0
     for _ in range(1,sim.n_steps_equilibrate)
         ps, U_current, _ = sim(sys, F2, F3, U_current, disp_idxs, ps)
     end
@@ -154,19 +162,29 @@ function runMC(sys::SuperCellSystem{D}, TEP_path::String, sim::MC_Simulation, ou
 
     #Set values for sampling run
     num_accepted = 0
-    U_arr = zeros(sim.n_steps)*energy_unit
+    U_arr = zeros(sim.n_steps)
     U_arr[1] = U_current
 
-    save_data(ps, outpath, 1, Val{output_type})
+    #Storage to avoid writing every step
+    ps.r_uw_out[:,:,1] .= ps.r_uw
+    current_save_idx = 2
+    last_save_idx = 1
 
     for idx in range(2,sim.n_steps)
         ps, U_arr[idx], accepted = sim(sys, F2, F3, U_arr[idx-1], disp_idxs, ps)
         num_accepted += accepted
 
-        #* check if this is bottleneck, could write every N steps to disk at cost of memory
-        #* Could make separate channel/thread and copy data there. 
-        save_data(ps, outpath, idx, Val{output_type})
+        ps.r_uw_out[:,:,current_save_idx] .= ps.r_uw
+
+        if idx % save_interval == 0
+            save_data(ps, outpath, last_save_idx:idx, Val(output_type))
+            current_save_idx = 1
+            last_save_idx = idx
+        end
     end
+
+    #Save whatever is currently in the buffer
+    save_data(ps, outpath, last_save_idx:sim.n_steps, Val(output_type))
 
     return U_arr, num_accepted
 end
