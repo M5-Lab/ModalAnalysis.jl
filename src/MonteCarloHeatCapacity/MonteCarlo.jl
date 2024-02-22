@@ -16,15 +16,15 @@ function MC_Simulation(n_steps::Int, n_steps_equilibrate::Int, step_size_std, te
         n_steps, n_steps_equilibrate, sampling_dist, initial_posns, temp, beta)
 end
 
-struct PositionStorage{L,U}
-    r::Vector{Vector{L}}
-    r_uw::Matrix{L}
+mutable struct PositionStorage{L,U}
+    const r::Vector{Vector{L}}
+    const r_uw::Matrix{L}
     disp::Vector{U}
     disp_new::Vector{U}
     r_uw_out::Array{L,3}
 end
 
-function save_data(ps::PositionStorage, outpath, idx_rng::UnitRange, ::Val{:NMA})
+function save_data(ps::PositionStorage, outpath, idx_rng::StepRange, ::Val{:NMA})
     jldopen(joinpath(outpath, "mc_unwrapped_coords.jld2"), "a+") do file
         for k in range(1, length(idx_rng))
             file["r_uw$(idx_rng[k])"] = DataFrame(xu = view(ps.r_uw_out, :, 1, k),
@@ -63,7 +63,7 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, F2::Array{T,2}, F3::Array
     #Update position
     ps.r[i] .+= Δr
     ps.r_uw[i,:] .+= Δr
-    ps.disp_new[disp_idxs] .+= Δr
+    ps.disp_new[disp_idxs] .+= Δr #* wrong?
 
     #Enforce PBC
     ps.r[i] = enforce_cell_size!(ps.r[i], ustrip.(sys.box_sizes_SC))
@@ -74,20 +74,20 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, F2::Array{T,2}, F3::Array
     if delta_U < 0
         U_current += delta_U
         accepted = true
+        ps.disp[disp_idxs] .+= Δr #update prev disp to match this step
     else
         p_accept = exp(-sim.beta*delta_U)
         accept_move = sample([false,true], ProbabilityWeights([1 - p_accept, p_accept]))
         if accept_move
             accepted = true
             U_current += delta_U
-        else # rejected
+            ps.disp[disp_idxs] .+= Δr #update prev disp to match this step
+        else # rejected, revert changes
             ps.r[i] .-= Δr
             ps.r_uw[i,:] .-= Δr
             ps.disp_new[disp_idxs] .-= Δr
         end
     end
-
-    ps.disp .= ps.disp_new
 
     return ps, U_current, accepted
 end
@@ -136,7 +136,8 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, pot::Potential, U_current
 end
 
 #Generate configurations, energies are calculate with atom-based TEP
-function runMC(sys::SuperCellSystem{D}, TEP_path::String, sim::MC_Simulation, outpath, output_type;
+function runMC(sys::SuperCellSystem{D}, TEP_path::String, sim::MC_Simulation,
+     outpath, output_type::Symbol, data_interval::Int;
      F2_name::String = "F2", F3_name::String = "F3") where D
 
     N_atoms = n_atoms(sys)
@@ -148,8 +149,8 @@ function runMC(sys::SuperCellSystem{D}, TEP_path::String, sim::MC_Simulation, ou
     r_uw = permutedims(reshape(deepcopy(reduce(vcat,r)), (D, N_atoms)), (2,1))
     u = zeros(D*N_atoms)
 
-    save_interval = calculate_save_interlval(N_atoms, D, typeof(r_uw[1,1]))
-    ps = PositionStorage(r, r_uw, u, deepcopy(u), zeros(size(r_uw)..., save_interval))
+    save_size = calculate_save_interlval(N_atoms, D, typeof(r_uw[1,1]))
+    ps = PositionStorage(r, r_uw, u, deepcopy(u), zeros(size(r_uw)..., save_size))
 
     disp_idxs = zeros(Int64, D)
 
@@ -168,23 +169,38 @@ function runMC(sys::SuperCellSystem{D}, TEP_path::String, sim::MC_Simulation, ou
     #Storage to avoid writing every step
     ps.r_uw_out[:,:,1] .= ps.r_uw
     current_save_idx = 2
-    last_save_idx = 1
+    last_save_idx = 0
+    n_traj_saved = 1
 
     for idx in range(2,sim.n_steps)
         ps, U_arr[idx], accepted = sim(sys, F2, F3, U_arr[idx-1], disp_idxs, ps)
         num_accepted += accepted
 
-        ps.r_uw_out[:,:,current_save_idx] .= ps.r_uw
 
-        if idx % save_interval == 0
-            save_data(ps, outpath, last_save_idx:idx, Val(output_type))
-            current_save_idx = 1
-            last_save_idx = idx
+        if (idx-1) % data_interval == 0
+            ps.r_uw_out[:,:,current_save_idx] .= ps.r_uw
+
+            if current_save_idx == save_size
+                n_traj_saved += length((last_save_idx+1):data_interval:idx)
+                save_data(ps, outpath, (last_save_idx+1):data_interval:idx, Val(output_type))
+                current_save_idx = 1
+                last_save_idx = idx
+            end
+
+            current_save_idx += 1
         end
+
     end
 
     #Save whatever is currently in the buffer
-    save_data(ps, outpath, last_save_idx:sim.n_steps, Val(output_type))
+    remaining_saves = (last_save_idx+1):data_interval:sim.n_steps
+    n_traj_saved += length(remaining_saves)
+    save_data(ps, outpath, remaining_saves, Val(output_type))
+
+    jldopen(joinpath(outpath, "mc_unwrapped_coords.jld2"), "a+") do file
+        file["N_trajectories"] = n_traj_saved
+        file["Interval"] = data_interval
+    end
 
     return U_arr, num_accepted
 end
