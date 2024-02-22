@@ -40,7 +40,7 @@ end
 function ΔU3(F3, u_last, u_current, Δu, i, j, k)
 
     ΔU3_vals = zeros(length(u_last))
-    Threads.@threads :dynamic for m in eachindex(u_last)
+    for m in eachindex(u_last) #* could parallelize but specify number of threads
         ΔU3_vals[m] = ΔU3_helper(view(F3,:,:,m), m, u_last, u_current, i, j, k, Δu)
     end
 

@@ -136,13 +136,10 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, pot::Potential, U_current
 end
 
 #Generate configurations, energies are calculate with atom-based TEP
-function runMC(sys::SuperCellSystem{D}, TEP_path::String, sim::MC_Simulation,
-     outpath, output_type::Symbol, data_interval::Int;
-     F2_name::String = "F2", F3_name::String = "F3") where D
+function runMC(sys::SuperCellSystem{D}, sim::MC_Simulation,
+     outpath, output_type::Symbol, data_interval::Int, F2, F3) where D
 
     N_atoms = n_atoms(sys)
-
-    F2, F3 = load(TEP_path, F2_name, F3_name)
 
     #Create copies of positions that I can modify freely
     r = ustrip.(deepcopy(ustrip.(positions(sys))))
