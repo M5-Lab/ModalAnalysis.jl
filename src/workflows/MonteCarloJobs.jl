@@ -25,7 +25,7 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::Function,
         error("Cannot have more temperatures: $(length(temperatures)) than threads: $(Threads.nthreads()).")
     end
 
-    cores_per_temp = floor(Threads.nthreads() / length(temperatures))
+    cores_per_temp = floor(Int64, Threads.nthreads() / length(temperatures))
 
     #Pick step sizes based on temperatures
     step_size_stds = zeros(length(temperatures))
@@ -45,7 +45,7 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::Function,
                 outpath_seed = joinpath(outpath, "seed$(seed)")
                 mkdir(outpath_seed)
 
-                sim = MC_Simulation(n_steps, n_steps_equil, step_size_std[i], temp, kB, deepcopy(positions(sys)))
+                sim = MC_Simulation(n_steps, n_steps_equil, step_size_stds[i], temp, kB, deepcopy(positions(sys)))
 
                 U_arr, num_accepted = runMC(sys, sim, outpath_seed, output_type, data_interval, F2, F3)
 
