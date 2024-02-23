@@ -158,7 +158,7 @@ function runMC(sys::SuperCellSystem{D}, sim::MC_Simulation,
     for _ in range(1,sim.n_steps_equilibrate)
         ps, U_current, _ = sim(sys, F2, F3, U_current, disp_idxs, ps)
     end
-    @info "Equilibration complete"
+    # @info "Equilibration complete"
 
     #Set values for sampling run
     num_accepted = 0

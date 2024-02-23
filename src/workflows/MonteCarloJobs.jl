@@ -36,7 +36,7 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::Function,
         close(f)
 
         step_size_stds[i], percent_accepted = pick_step_size(sys, 10000, length_scale, F2, F3, temp, kB)
-        @info "Chose step size std: $(step_size_std) for temperature: $(temp)K with $(percent_accepted)% accepted."
+        @info "Chose step size std: $(step_size_stds[i]) for temperature: $(temp)K with $(percent_accepted)% accepted."
 
         Threads.@threads for chunk_i in 1:cores_per_temp
             for seed in chunk_i:cores_per_temp:n_seeds
