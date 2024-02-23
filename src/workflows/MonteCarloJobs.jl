@@ -31,7 +31,9 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::String,
 
         U_arr, num_accepted = runMC(sys, sim, outpath_seed, output_type, data_interval, F2, F3)
 
-        jldsave(joinpath(outpath_seed, "MC_stats.jld2"), U_arr = U_arr, percent_accepted = 100*num_accepted/sim.n_steps)
+        jldsave(joinpath(outpath_seed, "MC_stats.jld2"), 
+                U_arr = U_arr, percent_accepted = 100*num_accepted/sim.n_steps,
+                step_size_std = step_size_std)
     end
 
 end
