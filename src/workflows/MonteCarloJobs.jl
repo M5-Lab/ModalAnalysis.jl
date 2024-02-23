@@ -42,8 +42,8 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::Function,
             for seed in chunk_i:cores_per_temp:n_seeds
 
                 @info "Starting seed $(seed) for temperature $(temp)K"
-                outpath_seed = joinpath(outpath, "seed$(seed)")
-                mkdir(outpath_seed)
+                outpath_seed = joinpath(outpath, "T$(temp)", "seed$(seed)")
+                mkpath(outpath_seed)
 
                 sim = MC_Simulation(n_steps, n_steps_equil, step_size_stds[i], temp, kB, deepcopy(positions(sys)))
 
