@@ -15,6 +15,8 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::Function,
      temperatures::AbstractVector{<:Real}, kB, data_interval::Int, n_seeds::Int, length_scale; output_type = :NMA,
      F2_name::String = "F2", F3_name::String = "F3") where D
 
+     mkdir(outpath)
+
     if output_type ∉ (:NMA, :INMA)
         error("output_type must be :NMA or :INMA got $(output_type)")
     end
@@ -32,13 +34,13 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::Function,
         @info "Chose step size std: $(step_size_std) for temperature: $(temp)K with $(percent_accepted)% accepted."
     end
 
-
     Threads.@threads for (i,temp) in enumerate(temperatures)
         F2, F3 =  load(TEP_path(temp), F2_name, F3_name)
 
         Threads.@threads for chunk_i in 1:cores_per_temp
             for seed in chunk_i:cores_per_temp:n_seeds
 
+                @info "Starting seed $(seed) for temperature $(temp)K"
                 outpath_seed = joinpath(outpath, "seed$(seed)")
                 mkdir(outpath_seed)
 
