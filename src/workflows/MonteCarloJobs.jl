@@ -1,4 +1,4 @@
-export MonteCarloJob
+export MonteCarloMAJob
 
 
 """
@@ -10,9 +10,9 @@ Currently no parallelization within a simulation, run as many seeds as cores ava
 creates 0.5 GB of position storage plus other storage. Ensure you have ~ 1GB of RAM per seed plus
 enough to store the second and third order force constants in RAM.
 """
-function MonteCarloJob(sys::SuperCellSystem{D}, TEP_path::String,
-     n_steps::Int, n_steps_equil::Int, step_size_std, outpath::String,
-     temp, kB, data_interval::Int, n_seeds::Int; output_type = :NMA,
+function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::String,
+     n_steps::Int, n_steps_equil::Int, outpath::String,
+     temp, kB, data_interval::Int, n_seeds::Int, length_scale; output_type = :NMA,
      F2_name::String = "F2", F3_name::String = "F3") where D
 
     if output_type ∉ (:NMA, :INMA)
@@ -20,6 +20,9 @@ function MonteCarloJob(sys::SuperCellSystem{D}, TEP_path::String,
     end
 
     F2, F3 =  load(TEP_path, F2_name, F3_name)
+
+    step_size_std, percent_accepted = pick_step_size(sys, 10000, length_scale, F2, F3, temp, kB)
+    @info "Chose step size std: $(step_size_std) for temperature: $(temp)K with $(percent_accepted)% accepted."
 
     Threads.@threads for seed in 1:n_seeds
         outpath_seed = joinpath(outpath, "seed$(seed)")
@@ -33,4 +36,8 @@ function MonteCarloJob(sys::SuperCellSystem{D}, TEP_path::String,
 
 end
 
+
+function MonteCarloJob()
+    #TODO just runs with empirical potential like LJ
+end
 

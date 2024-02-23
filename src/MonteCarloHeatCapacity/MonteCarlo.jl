@@ -1,4 +1,4 @@
-export MC_Simulation, runMC
+export MC_Simulation, runMC, pick_step_size
 
 struct MC_Simulation{S,L,T,B}
     n_steps::Int
@@ -23,6 +23,8 @@ mutable struct PositionStorage{L,U}
     disp_new::Vector{U}
     r_uw_out::Array{L,3}
 end
+
+save_data(ps::PositionStorage, outpath, idx_rng, ::Val{:None}) = nothing
 
 function save_data(ps::PositionStorage, outpath, idx_rng::StepRange, ::Val{:NMA})
     jldopen(joinpath(outpath, "mc_unwrapped_coords.jld2"), "a+") do file
@@ -202,6 +204,60 @@ function runMC(sys::SuperCellSystem{D}, sim::MC_Simulation,
     return U_arr, num_accepted
 end
 
+#Crude but at least its automatic
+# Grid search valaues based on provided length scale
+function pick_step_size(sys::SuperCellSystem{D}, n_steps, length_scale, F2, F3, temp, kB) where D
+
+    max_accepted = 70
+    min_accepted = 30
+
+    percent_accepted = 0.0
+    step_size = 0.005*length_scale #start with small dx and increase from there
+    dx = 0.01*length_scale
+
+    #Increase step size until at most 70% accepted
+    while true
+        percent_accepted = step_size_iter(sys, n_steps, F2, F3, temp, kB, step_size)
+        # @info "$(step_size) $(percent_accepted) $(max_accepted)"
+        if percent_accepted < max_accepted
+            break
+        else
+            step_size += dx
+        end
+    end
+
+    if percent_accepted < min_accepted
+        @warn "Automatic step size selection might have failed. Ended with $(percent_accepted)% accepted
+                    and step size $(step_size)"
+    end
+    
+    return step_size, percent_accepted
+end
+
+function step_size_iter(sys::SuperCellSystem{D}, n_steps, F2, F3, temp, kB, step_size) where D
+
+    U_current = 0.0
+    disp_idxs = zeros(Int64, D)
+    N_atoms = n_atoms(sys)
+
+    r = ustrip.(deepcopy(ustrip.(positions(sys))))
+    r_uw = permutedims(reshape(deepcopy(reduce(vcat,r)), (D, N_atoms)), (2,1))
+    u = zeros(D*N_atoms)
+
+    save_size = 1
+    ps = PositionStorage(r, r_uw, u, deepcopy(u), zeros(size(r_uw)..., save_size))
+    n_accept = 0
+
+    sim = MC_Simulation(n_steps, n_steps, step_size, temp, kB, deepcopy(positions(sys)))
+
+    for _ in range(1,n_steps)
+        _, _, accepted = sim(sys, F2, F3, U_current, disp_idxs, ps)
+        n_accept += accepted
+    end
+
+    return 100*n_accept/n_steps
+
+end
 
 #Energy change when single atom is moved
 function U_single(r, pot::PairPotential, box_sizes, j::Int)
