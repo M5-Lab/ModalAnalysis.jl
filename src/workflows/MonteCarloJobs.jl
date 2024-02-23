@@ -31,7 +31,9 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::Function,
     step_size_stds = zeros(length(temperatures))
 
     Threads.@threads for (i,temp) in collect(enumerate(temperatures))
-        F2, F3 =  load(TEP_path(temp), F2_name, F3_name)
+        f = jldopen(TEP_path(temp), "r"; parallel_read = true)
+        F2 = f[F2_name]; F3 = f[F3_name]
+        close(f)
 
         step_size_stds[i], percent_accepted = pick_step_size(sys, 10000, length_scale, F2, F3, temp, kB)
         @info "Chose step size std: $(step_size_std) for temperature: $(temp)K with $(percent_accepted)% accepted."
