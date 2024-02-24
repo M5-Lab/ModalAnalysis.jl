@@ -175,7 +175,7 @@ function runMC(sys::SuperCellSystem{D}, sim::MC_Simulation,
         ps, U_arr[idx], accepted = sim(sys, F2, F3, U_arr[idx-1], disp_idxs, ps)
         num_accepted += accepted
 
-
+        
         if (idx-1) % data_interval == 0
             ps.r_uw_out[:,:,current_save_idx] .= ps.r_uw
 
@@ -192,13 +192,15 @@ function runMC(sys::SuperCellSystem{D}, sim::MC_Simulation,
     end
 
     #Save whatever is currently in the buffer
-    remaining_saves = (last_save_idx+1):data_interval:sim.n_steps
-    n_traj_saved += length(remaining_saves)
-    save_data(ps, outpath, remaining_saves, Val(output_type))
+    if output_type != :None
+        remaining_saves = (last_save_idx+1):data_interval:sim.n_steps
+        n_traj_saved += length(remaining_saves)
+        save_data(ps, outpath, remaining_saves, Val(output_type))
 
-    jldopen(joinpath(outpath, "mc_unwrapped_coords.jld2"), "a+") do file
-        file["N_trajectories"] = n_traj_saved
-        file["Interval"] = data_interval
+        jldopen(joinpath(outpath, "mc_unwrapped_coords.jld2"), "a+") do file
+            file["N_trajectories"] = n_traj_saved
+            file["Interval"] = data_interval
+        end
     end
 
     return U_arr, num_accepted

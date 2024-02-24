@@ -53,14 +53,30 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::Function,
                     U_arr = U_arr,
                     percent_accepted = 100*num_accepted/sim.n_steps,
                     step_size_std = step_size_stds[i],
-                    cv_norm = var(U_arr)/((kB^2)*(T^2)*(3*(n_atoms(sys)- 1))),
+                    cv_norm = var(U_arr)/((kB^2)*(temp^2)*(3*(n_atoms(sys)- 1))),
                     kB = kB,
-                    T = T,
+                    T = temp,
                     ndof = 3*(n_atoms(sys)- 1)
                 )
+
+                @info "Finished seed $(seed) for temperature $(temp)K with $(100*num_accepted/sim.n_steps)% accepted."
             end
             
         end
+
+        @info "Averaging Seeds"
+        Threads.@threads for (i,temp) in collect(enumerate(temperatures))
+            cvs_T = zeros(n_seeds)
+            for seed in 1:n_seeds
+                data_path = joinpath(outpath, "T$(temp)", "seed$(seed)", "MC_stats.jld2")
+                cvs_T[seed] = load(data_path, "cv_norm")
+            end
+
+            cv_mean = mean(cvs_T)
+            std_err = std(cvs_T)/sqrt(n_seeds)
+            jldsave(joinpath(outpath, "T$(temp)", "cv_averaged.jld2"), cv_norm_avg = cv_mean, cv_norm_std_err = std_err)
+        end
+
     end
 
 end
