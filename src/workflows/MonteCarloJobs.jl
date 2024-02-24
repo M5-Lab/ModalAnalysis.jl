@@ -17,7 +17,7 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::Function,
 
      mkdir(outpath)
 
-    if output_type ∉ (:NMA, :INMA)
+    if output_type ∉ (:NMA, :INMA, :None)
         error("output_type must be :NMA or :INMA got $(output_type)")
     end
 
