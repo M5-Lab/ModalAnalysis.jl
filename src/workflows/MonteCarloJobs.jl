@@ -50,8 +50,14 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::Function,
                 U_arr, num_accepted = runMC(sys, sim, outpath_seed, output_type, data_interval, F2, F3)
 
                 jldsave(joinpath(outpath_seed, "MC_stats.jld2"), 
-                        U_arr = U_arr, percent_accepted = 100*num_accepted/sim.n_steps,
-                        step_size_std = step_size_stds[i])
+                    U_arr = U_arr,
+                    percent_accepted = 100*num_accepted/sim.n_steps,
+                    step_size_std = step_size_stds[i],
+                    cv_norm = var(U_arr)/((kB^2)*(T^2)*(3*(n_atoms(sys)- 1))),
+                    kB = kB,
+                    T = T,
+                    ndof = 3*(n_atoms(sys)- 1)
+                )
             end
             
         end
