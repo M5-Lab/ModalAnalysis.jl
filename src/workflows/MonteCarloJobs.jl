@@ -64,18 +64,17 @@ function MonteCarloMAJob(sys::SuperCellSystem{D}, TEP_path::Function,
             
         end
 
-        @info "Averaging Seeds"
-        Threads.@threads for (i,temp) in collect(enumerate(temperatures))
-            cvs_T = zeros(n_seeds)
-            for seed in 1:n_seeds
-                data_path = joinpath(outpath, "T$(temp)", "seed$(seed)", "MC_stats.jld2")
-                cvs_T[seed] = load(data_path, "cv_norm")
-            end
-
-            cv_mean = mean(cvs_T)
-            std_err = std(cvs_T)/sqrt(n_seeds)
-            jldsave(joinpath(outpath, "T$(temp)", "cv_averaged.jld2"), cv_norm_avg = cv_mean, cv_norm_std_err = std_err)
+        cvs_T = zeros(n_seeds)
+        for seed in 1:n_seeds
+            data_path = joinpath(outpath, "T$(temp)", "seed$(seed)", "MC_stats.jld2")
+            cvs_T[seed] = load(data_path, "cv_norm")
         end
+
+        cv_mean = mean(cvs_T)
+        std_err = std(cvs_T)/sqrt(n_seeds)
+        jldsave(joinpath(outpath, "T$(temp)", "cv_averaged.jld2"), cv_norm_avg = cv_mean, cv_norm_std_err = std_err)
+
+        @info "Temperature $(temp)K finished. CV: $(cv_mean) ± $(std_err)"
 
     end
 
