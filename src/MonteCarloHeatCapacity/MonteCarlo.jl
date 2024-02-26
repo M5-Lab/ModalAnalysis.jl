@@ -65,7 +65,7 @@ function (sim::MC_Simulation)(sys::SuperCellSystem{D}, F2::Array{T,2}, F3::Array
     #Update position
     ps.r[i] .+= Δr
     ps.r_uw[i,:] .+= Δr
-    ps.disp_new[disp_idxs] .+= Δr #* wrong?
+    ps.disp_new[disp_idxs] .+= Δr
 
     #Enforce PBC
     ps.r[i] = enforce_cell_size!(ps.r[i], ustrip.(sys.box_sizes_SC))
@@ -154,17 +154,17 @@ function runMC(sys::SuperCellSystem{D}, sim::MC_Simulation,
     disp_idxs = zeros(Int64, D)
 
     #Equilibrate System
-    U_current = 0.0
     U_arr_equil = zeros(sim.n_steps_equilibrate)
-    for i in range(1,sim.n_steps_equilibrate)
-        ps, U_arr_equil[i], _ = sim(sys, F2, F3, U_current, disp_idxs, ps)
+    U_arr_equil[1] = 0.0
+    for i in range(2,sim.n_steps_equilibrate)
+        ps, U_arr_equil[i], _ = sim(sys, F2, F3, U_arr_equil[i-1], disp_idxs, ps)
     end
     # @info "Equilibration complete"
 
     #Set values for sampling run
     num_accepted = 0
     U_arr = zeros(sim.n_steps)
-    U_arr[1] = U_current
+    U_arr[1] = U_arr_equil[end]
 
     #Storage to avoid writing every step
     ps.r_uw_out[:,:,1] .= ps.r_uw
