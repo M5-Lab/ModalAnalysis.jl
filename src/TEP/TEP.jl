@@ -80,6 +80,12 @@ function U_TEP3_CUDA(cuF3::CuArray{Float32,3}, cu_u::CuArray{Float32,1})
     return U/6
 end
 
+function U_TEP3(F3::Array{T,3}, u::Array{T,1}) where T
+    @tensor begin
+        U = F3[i,j,k] * u[i] * u[j] * u[k]
+    end
+    return U/6
+end
 
 
 ########### TESTING

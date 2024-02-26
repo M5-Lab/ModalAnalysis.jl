@@ -155,8 +155,9 @@ function runMC(sys::SuperCellSystem{D}, sim::MC_Simulation,
 
     #Equilibrate System
     U_current = 0.0
-    for _ in range(1,sim.n_steps_equilibrate)
-        ps, U_current, _ = sim(sys, F2, F3, U_current, disp_idxs, ps)
+    U_arr_equil = zeros(sim.n_steps_equilibrate)
+    for i in range(1,sim.n_steps_equilibrate)
+        ps, U_arr_equil[i], _ = sim(sys, F2, F3, U_current, disp_idxs, ps)
     end
     # @info "Equilibration complete"
 
@@ -175,7 +176,7 @@ function runMC(sys::SuperCellSystem{D}, sim::MC_Simulation,
         ps, U_arr[idx], accepted = sim(sys, F2, F3, U_arr[idx-1], disp_idxs, ps)
         num_accepted += accepted
 
-        
+
         if (idx-1) % data_interval == 0
             ps.r_uw_out[:,:,current_save_idx] .= ps.r_uw
 
@@ -203,7 +204,7 @@ function runMC(sys::SuperCellSystem{D}, sim::MC_Simulation,
         end
     end
 
-    return U_arr, num_accepted
+    return U_arr, U_arr_equil, num_accepted
 end
 
 #Crude but at least its automatic

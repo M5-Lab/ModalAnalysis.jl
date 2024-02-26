@@ -68,7 +68,6 @@ function ΔU3_helper(F3_slice, slice_idx, u, u_current, i, j, k, Δu)
         ΔU3 -= (1/3) * u[slice_idx] * F3_slice[i, k] * (Δu[i]*u[k] + Δu[k]*u[i] + Δu[i]*Δu[k])
         ΔU3 -= (1/3) * u[slice_idx] * F3_slice[j, k] * (Δu[j]*u[k] + Δu[k]*u[j] + Δu[j]*Δu[k])
 
-
         # Correct for self terms being over-counted
         ΔU3 -= (1/6) * F3_slice[i, i] * (u[slice_idx] * (2*Δu[i]*u[i] + Δu[i]*Δu[i]))
         ΔU3 -= (1/6) * F3_slice[j, j] * (u[slice_idx] * (2*Δu[j]*u[j] + Δu[j]*Δu[j]))
@@ -84,7 +83,6 @@ function ΔU3_helper(F3_slice, slice_idx, u, u_current, i, j, k, Δu)
                     - u[col]*u[row]*u[slice_idx])
             end
         end
-
         # Correct for diagonal terms being over-counted
         @turbo for i in range(1,length(u))
             ΔU3 -= (1/6) * F3_slice[i, i] * (u[slice_idx] * (2*Δu[i]*u[i] + Δu[i]*Δu[i]) + Δu[slice_idx]* (u[i]*u[i] + 2*Δu[i]*u[i] + Δu[i]*Δu[i]))
