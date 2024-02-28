@@ -42,20 +42,25 @@ end
     run(nma::NormalModeAnalysis, dm::DeviationMetric)
     run(nma::NormalModeAnalysis, mcc_block_size::Integer, dm::DeviationMetric)
 """
-function run(inma::InstantaneousNormalModeAnalysis, dm::DeviationMetric)
+function run(inma::InstantaneousNormalModeAnalysis, dm::DeviationMetric; ref_energy = :TEP)
+
+    if ref_energy ∉ (:TEP, :MD)
+        error("ref_energy must be :TEP or :MD got $(ref_energy)")
+    end
+
     dynmat = dynamical_matrix(inma.reference_sys, inma.potential, inma.calc)
     freqs_sq, _ = get_modes(dynmat)
     N_modes = length(freqs_sq)
-    INMA_loop(inma, inma.simulation_folder, dm, nothing, N_modes)
+    INMA_loop(inma, inma.simulation_folder, dm, nothing, N_modes, ref_energy)
 end
 
 function run(inma::InstantaneousNormalModeAnalysis, mcc_block_size::Integer, 
-    dm::DeviationMetric)
+    dm::DeviationMetric; ref_energy = :TEP)
 
     dynmat = dynamical_matrix(inma.reference_sys, inma.potential, inma.calc)
     freqs_sq, _ = get_modes(dynmat)
     N_modes = length(freqs_sq)
-    INMA_loop(inma, inma.simulation_folder, dm, mcc_block_size, N_modes)
+    INMA_loop(inma, inma.simulation_folder, dm, mcc_block_size, N_modes, ref_energy)
 end
 
 function calculate_INMs(inma::InstantaneousNormalModeAnalysis, mcc_block_size, mass_sqrt)
@@ -88,7 +93,7 @@ end
 
 
 function INMA_loop(inma::InstantaneousNormalModeAnalysis, out_path::String,
-        dm::DeviationMetric, mcc_block_size::Union{Integer, Nothing}, N_modes::Integer)
+        dm::DeviationMetric, mcc_block_size::Union{Integer, Nothing}, N_modes::Integer, ref_energy_mode::Symbol)
     
     N_atoms = length(inma.atom_masses)
     mass_sqrt = sqrt.(inma.atom_masses)
@@ -110,7 +115,7 @@ function INMA_loop(inma::InstantaneousNormalModeAnalysis, out_path::String,
 
     dump_file = open(inma.ld.path, "r")
     f0_nmc, freqs_sq, phi, cuK3, reference_data = nothing, nothing, nothing, nothing, nothing
-
+    ref_energy = 0.0
  
     recalc_counter = 1
     for i in 1:inma.ld.n_samples
@@ -123,6 +128,12 @@ function INMA_loop(inma::InstantaneousNormalModeAnalysis, out_path::String,
 
             recalculate_INMs = false
             reference_idx = i
+
+            if i == 1
+                ref_energy = inma.pot_eng_MD[1]
+            else
+                ref_energy = (ref_energy_mode == :MD) ? inma.pot_eng_MD[i] : total_eng_INM[i-1]
+            end
 
             #Create new group
             group_name = "INM$(recalc_counter)"
@@ -147,7 +158,7 @@ function INMA_loop(inma::InstantaneousNormalModeAnalysis, out_path::String,
         mode_potential_order3[:,i] .= (-f0_nmc.*q) .+
                                       0.5.*(freqs_sq .* (q.^2)) .+ 
                                       Array(U_TEP3_n_CUDA(cuK3, cuQ))
-        total_eng_INM[i] = @views sum(mode_potential_order3[:,i]) + inma.pot_eng_MD[reference_idx]
+        total_eng_INM[i] = @views sum(mode_potential_order3[:,i]) + ref_energy
         
         if check_energy_deviation(inma.pot_eng_MD, total_eng_INM, i, reference_idx, dm)
             recalculate_INMs = true
