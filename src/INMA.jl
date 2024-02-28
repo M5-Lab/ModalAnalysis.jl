@@ -42,25 +42,29 @@ end
     run(nma::NormalModeAnalysis, dm::DeviationMetric)
     run(nma::NormalModeAnalysis, mcc_block_size::Integer, dm::DeviationMetric)
 """
-function run(inma::InstantaneousNormalModeAnalysis, dm::DeviationMetric; ref_energy = :TEP)
+function run(inma::InstantaneousNormalModeAnalysis, dm::DeviationMetric; ref_energy_mode = :TEP)
 
-    if ref_energy ∉ (:TEP, :MD)
-        error("ref_energy must be :TEP or :MD got $(ref_energy)")
+    if ref_energy_mode ∉ (:TEP, :MD)
+        error("ref_energy_mode must be :TEP or :MD got $(ref_energy_mode)")
     end
 
     dynmat = dynamical_matrix(inma.reference_sys, inma.potential, inma.calc)
     freqs_sq, _ = get_modes(dynmat)
     N_modes = length(freqs_sq)
-    INMA_loop(inma, inma.simulation_folder, dm, nothing, N_modes, ref_energy)
+    INMA_loop(inma, inma.simulation_folder, dm, nothing, N_modes, ref_energy_mode)
 end
 
 function run(inma::InstantaneousNormalModeAnalysis, mcc_block_size::Integer, 
-    dm::DeviationMetric; ref_energy = :TEP)
+    dm::DeviationMetric; ref_energy_mode = :TEP)
+
+    if ref_energy_mode ∉ (:TEP, :MD)
+        error("ref_energy_mode must be :TEP or :MD got $(ref_energy_mode)")
+    end
 
     dynmat = dynamical_matrix(inma.reference_sys, inma.potential, inma.calc)
     freqs_sq, _ = get_modes(dynmat)
     N_modes = length(freqs_sq)
-    INMA_loop(inma, inma.simulation_folder, dm, mcc_block_size, N_modes, ref_energy)
+    INMA_loop(inma, inma.simulation_folder, dm, mcc_block_size, N_modes, ref_energy_mode)
 end
 
 function calculate_INMs(inma::InstantaneousNormalModeAnalysis, mcc_block_size, mass_sqrt)
@@ -123,7 +127,6 @@ function INMA_loop(inma::InstantaneousNormalModeAnalysis, out_path::String,
         parse_next_timestep!(inma.ld, dump_file)
 
         if recalculate_INMs
-            #& probably should re-use this storage instead of re-allocating
             f0_nmc, freqs_sq, phi, cuK3, reference_data = calculate_INMs(inma, mcc_block_size, mass_sqrt) 
 
             recalculate_INMs = false
