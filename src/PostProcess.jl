@@ -3,8 +3,6 @@ export NM_postprocess, NMA_avg_seeds, make_plots
 function NM_postprocess(nma::NormalModeAnalysis, kB; nthreads::Integer = Threads.nthreads(),
      average_identical_freqs = true, freq_digits = 7)
 
-    timer = TimerOutput()
-
     T = nma.temperature
     energies_path = joinpath(nma.simulation_folder, "ModeEnergies.jld2")
     tep_path = joinpath(nma.simulation_folder, "TEP.jld2")
@@ -62,9 +60,6 @@ function NM_postprocess(nma::NormalModeAnalysis, kB; nthreads::Integer = Threads
         cv3_cov = cv3_cov, freqs = freqs, cv_TEP_full_dist = cv_TEP_total)
     end
 
-    open(joinpath(nma.simulation_folder, "timings.txt"), "a+") do f
-        print_timer(f, timer, title = "NMA Post")
-    end
 
 end
 

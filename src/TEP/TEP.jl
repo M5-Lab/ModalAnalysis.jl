@@ -80,6 +80,24 @@ function U_TEP3_CUDA(cuF3::CuArray{Float32,3}, cu_u::CuArray{Float32,1})
     return U/6
 end
 
+#* TEST THIS FUNCTION
+function U_TEP3_CUDA(F3::Array{<:AbstractFloat,3}, cu_u::CuArray{Float32,1}, block_size::Integer)
+    N = size(F3,1)
+    U_out = 0.0
+    cuF3 = CUDA.zeros(Float32, N, N, block_size)
+    for i in 1:block_size:N
+        #Move chunk to GPU
+        copyto!(cuF3, F3[:,:,i:i+block_size-1])
+        cu_k_view = view(cu_u, i:i+block_size-1)
+        @tensor begin
+            U = cuF3[i,j,k]*cu_u[i]*cu_u[j]*cu_k_view[k]
+        end
+        U_out += U
+    end
+
+    return U_out/6
+end
+
 function U_TEP3(F3::Array{T,3}, u::Array{T,1}) where T
     @tensor begin
         U = F3[i,j,k] * u[i] * u[j] * u[k]

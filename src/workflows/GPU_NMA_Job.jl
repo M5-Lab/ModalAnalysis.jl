@@ -45,7 +45,7 @@ dynamics data was over a set of parameters and will parallelize the calculation 
 """
 function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::AbstractVector{<:Real},
      sim_folder_name::Function, tep_file_name::Function, n_seeds::Integer, pot::Potential;
-     other_params_to_sweep::Dict{String, AbstractVector{<:Real}} = Dict{String, AbstractVector{<:Real}}(),
+     other_params_to_sweep::Dict{String, <:AbstractVector{<:Real}} = Dict{String, AbstractVector{<:Real}}(),
      gpu_ids = CUDA.devices(), ncores = Threads.nthreads(), mcc_block_size::Union{Integer, Nothing} = nothing,
      avg_identical_freqs = false)
 
@@ -72,7 +72,7 @@ function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::Abst
             CUDA.device!(gpu_id-1)
             #Launch GPU Jobs in Serial
             for (temp, params..., seed) in gpu_job   
-                @info "Starting temperature $(temp), seed $(seed) on GPU $(gpu_id)"
+                @info "Starting temperature $(temp), seed $(seed), other paranms: $(params) on GPU $(gpu_id)"
                 seed_path = joinpath(sim_folder, sim_folder_name(temp, params...,seed-1)...)
                 TEP_path = joinpath(TEP_folder, tep_file_name(temp, params...))
 
