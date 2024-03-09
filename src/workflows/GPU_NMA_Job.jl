@@ -92,7 +92,7 @@ function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::Abst
     end
     
     @info "Averaing Seeds"
-    for (temp, p...) in Iterators.product(temperatures, values(other_params_to_sweep))
+    for (temp, p...) in Iterators.product(temperatures, values(other_params_to_sweep)...)
         folder_paths = sim_folder_name(temp, p..., 0)
         NMA_avg_seeds(joinpath(sim_folder, folder_paths[1:end-1]...), n_seeds, temp)
     end
