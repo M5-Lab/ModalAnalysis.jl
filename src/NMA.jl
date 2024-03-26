@@ -157,8 +157,6 @@ function NMA_loop(nma::MonteCarloNormalModeAnalysis, out_path::String, freqs_sq,
         total_eng_NM[i] = @views sum(mode_potential_order3[:,i])
     end
 
-    #* total_eng_NM SHOULD MATCH MONTE CARLO ENERGY EXACTLY!
-    #* CHECK THIS
 
     jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w"; compress = true) do file
         file["mode_potential_order3"] = mode_potential_order3
