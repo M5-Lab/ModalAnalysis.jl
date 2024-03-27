@@ -29,8 +29,7 @@ This function calculates the averaged instantaneous force constants for a given 
     Number of atoms in the system.
 - `outfilename::Function
     Function that returns a string given a temperature (`func(temp)`). This string is appended to `out_path`
-    to save the averaged force constants. For example, `(T) -> "AvgIFC_$(T)K"`. This should not include
-    the file extension.
+    to save the averaged force constants. This should not include the file extension.
 - `ncores::Integer = Threads.nthreads()`
     Number of CPU cores to use. By default this is `Threads.nthreads()`. The function will
     attempt to parallelize over temperatures if there is enough RAM.
