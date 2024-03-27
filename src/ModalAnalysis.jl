@@ -53,5 +53,6 @@ include("AverageINMs.jl")
 
 include("./workflows/GPU_NMA_Job.jl")
 include("./workflows/MonteCarloJobs.jl")
+include("./workflows/AvgINM_job.jl")
 
 end

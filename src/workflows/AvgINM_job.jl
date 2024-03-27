@@ -39,7 +39,6 @@ function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures:
             sim_base_path::String, sim_folder_name::Function, out_path::String, N_atoms::Integer;
             filename = (T) -> "AvgIFC_$(T)K", ncores = Threads.nthreads())
 
-    #*Check amount of RAM is enough
     N_IFC3 = (3*N_atoms)^3
     N_bytes_IFC3 = sizeof(Float64)*N_IFC3
     N_GB_total = N_bytes_IFC3*ncores/(1024^3)
