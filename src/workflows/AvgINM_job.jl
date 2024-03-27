@@ -27,17 +27,17 @@ This function calculates the averaged instantaneous force constants for a given 
     Path to save the averaged force constants.
 - `N_atoms::Integer`
     Number of atoms in the system.
-- `filename::Function = (T) -> "AvgIFC_$(T)K"`
+- `outfilename::Function
     Function that returns a string given a temperature (`func(temp)`). This string is appended to `out_path`
-    to save the averaged force constants. By default this is `(T) -> "AvgIFC_$(T)K"`. This should not include
+    to save the averaged force constants. For example, `(T) -> "AvgIFC_$(T)K"`. This should not include
     the file extension.
 - `ncores::Integer = Threads.nthreads()`
     Number of CPU cores to use. By default this is `Threads.nthreads()`. The function will
     attempt to parallelize over temperatures if there is enough RAM.
 """
 function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures::AbstractVector{<:Real},
-            sim_base_path::String, sim_folder_name::Function, out_path::String, N_atoms::Integer;
-            filename = (T) -> "AvgIFC_$(T)K", ncores = Threads.nthreads())
+            sim_base_path::String, sim_folder_name::Function, out_path::String, N_atoms::Integer,
+            outfilename::Function, ncores = Threads.nthreads())
 
     N_IFC3 = (3*N_atoms)^3
     N_bytes_IFC3 = sizeof(Float64)*N_IFC3
@@ -60,7 +60,7 @@ function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures:
 
             freqs_sq, phi = get_modes(avg_dynmat)
 
-            jldsave(joinpath(out_path, filename(temp) + ".jld2"), 
+            jldsave(joinpath(out_path, outfilename(temp) + ".jld2"), 
                 f0 = avg_forces, dynmat = avg_dynmat, 
                 F3 = avg_psi, freqs_sq = freqs_sq, phi = phi
             )
