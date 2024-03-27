@@ -46,7 +46,7 @@ function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures:
     @assert total_mem_GB > 1.1*N_GB_total "Not enough memory to use $(ncores) cores.
          $(N_GB_total) GB needed, $(total_mem_GB) GB available."
 
-    n_temps = length(tempeartures)
+    n_temps = length(temperatures)
 
     Threads.@threads for chunk_i in 1:ncores
         for i in chunk_i:ncores:n_temps
