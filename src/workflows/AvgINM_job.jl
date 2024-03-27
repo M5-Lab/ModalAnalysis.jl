@@ -2,8 +2,8 @@ export AvgINM_Job
 
 """
 AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures::AbstractVector{<:Real},
-            sim_folder_name::Function, out_path::String, N_atoms::Integer;
-            filename = (T) -> "AvgIFC_$(T)K", ncores = Threads.nthreads())
+            sim_folder_name::Function, out_path::String, N_atoms::Integer,
+            outfilename::Function; ncores = Threads.nthreads())
 
 This function calculates the averaged instantaneous force constants for a given potential, `pot`,
     using the ForceConstantCalculator, `calc`, over a range of temperatures, `temperatures`. This
@@ -37,7 +37,7 @@ This function calculates the averaged instantaneous force constants for a given 
 """
 function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures::AbstractVector{<:Real},
             sim_base_path::String, sim_folder_name::Function, out_path::String, N_atoms::Integer,
-            outfilename::Function, ncores = Threads.nthreads())
+            outfilename::Function; ncores = Threads.nthreads())
 
     N_IFC3 = (3*N_atoms)^3
     N_bytes_IFC3 = sizeof(Float64)*N_IFC3
