@@ -45,10 +45,10 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
             tmp_forces .= avg_forces ./ inma.ld.n_samples
             dynmat_storage .= avg_dynmat ./ inma.ld.n_samples
             psi_storage .= avg_psi ./ inma.ld.n_samples
-            freqs_sq, phi = get_modes(tmp_dynmat)
+            freqs_sq, phi = get_modes(dynmat_storage)
 
             checkpoint_dir = joinpath(out_path, "AvgINM_Checkpoint$(next_checkpoint_idx)")
-            isdir(checkpoint_dir) || mkdir(checkpoint_dir)
+            mkpath(checkpoint_dir)
 
             jldsave(joinpath(checkpoint_dir, filename), 
                 f0 = tmp_forces,
