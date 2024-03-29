@@ -36,11 +36,11 @@ This function calculates the averaged instantaneous force constants for a given 
 """
 function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures::AbstractVector{<:Real},
             sim_base_path::String, sim_folder_name::Function, out_path::String, N_atoms::Integer,
-            outfilename::Function; ncores = Threads.nthreads())
+            outfilename::Function; ncores = Threads.nthreads(), verbose = false, ncheckpoints = 1)
 
     N_IFC3 = (3*N_atoms)^3
     N_bytes_IFC3 = sizeof(Float64)*N_IFC3
-    N_GB_total = N_bytes_IFC3*ncores/(1024^3)
+    N_GB_total = 2*N_bytes_IFC3*ncores/(1024^3) #code stores 2 copies of IFC3 in mem
     total_mem_GB = Float64(Sys.total_memory())/(1024^3)
     @assert total_mem_GB > 1.1*N_GB_total "Not enough memory to use $(ncores) cores.
          $(N_GB_total) GB needed, $(total_mem_GB) GB available."
@@ -55,13 +55,16 @@ function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures:
 
             inma = InstantaneousNormalModeAnalysis(seed_path, pot, temp, calc)
 
-            avg_forces, avg_dynmat, avg_psi = get_average_INMs(inma, calc; verbose = false)
+            avg_forces, avg_dynmat, avg_psi = get_average_INMs(inma, calc;
+                 verbose = verbose, ncheckpoints = ncheckpoints,
+                 filename = outfilename(temp) * ".jld2")
 
             freqs_sq, phi = get_modes(avg_dynmat)
 
-            jldsave(joinpath(out_path, outfilename(temp) + ".jld2"), 
+            jldsave(joinpath(out_path, outfilename(temp) * ".jld2"), 
                 f0 = avg_forces, dynmat = avg_dynmat, 
-                F3 = avg_psi, freqs_sq = freqs_sq, phi = phi
+                F3 = avg_psi, freqs_sq = freqs_sq, phi = phi,
+                nsamples = inma.ld.n_samples
             )
             @info "Finished temperature: $(temp)"
         end
