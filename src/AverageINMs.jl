@@ -18,7 +18,8 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
 
     #Calculate indicies to save data to disk
     checkpoints = collect((inma.ld.n_samples ÷ ncheckpoints) .* (1:(ncheckpoints-1)))
-    
+    checkpoint_counter = 1
+
     verbose && @info "Starting temp: $(inma.temperature) with $(inma.ld.n_samples) samples and $(ncheckpoints) checkpoints."
     for i in 1:inma.ld.n_samples
         verbose && begin i % 200 == 0 && @info "Sample $i, T: $(inma.temperature)" end
@@ -45,7 +46,7 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
             psi_storage .= avg_psi ./ i
             freqs_sq, phi = get_modes(dynmat_storage)
 
-            checkpoint_dir = joinpath(inma.simulation_folder, "AvgINM_Checkpoint$(next_checkpoint_idx)")
+            checkpoint_dir = joinpath(inma.simulation_folder, "AvgINM_Checkpoint$(checkpoint_counter)")
             mkpath(checkpoint_dir)
 
             jldsave(joinpath(checkpoint_dir, filename), 
@@ -55,6 +56,8 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
                 freqs_sq = freqs_sq, phi = phi,
                 nsamples = i
             )
+
+            checkpoint_counter += 1
 
         end
 
