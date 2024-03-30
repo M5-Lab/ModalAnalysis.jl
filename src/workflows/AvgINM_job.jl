@@ -41,7 +41,7 @@ function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures:
     N_IFC3 = (3*N_atoms)^3
     N_bytes_IFC3 = sizeof(Float64)*N_IFC3
     N_GB_total = 2*N_bytes_IFC3*ncores/(1024^3) #code stores 2 copies of IFC3 in mem
-    total_mem_GB = Float64(Sys.total_memory())/(1024^3)
+    total_mem_GB = Float32(Sys.total_memory())/(1024^3)
     @assert total_mem_GB > 1.1*N_GB_total "Not enough memory to use $(ncores) cores.
          $(N_GB_total) GB needed, $(total_mem_GB) GB available."
 
