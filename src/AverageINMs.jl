@@ -23,7 +23,7 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
 
     verbose && @info "Starting temp: $(inma.temperature) with $(inma.ld.n_samples) samples and $(ncheckpoints) checkpoints."
     for i in 1:inma.ld.n_samples
-        verbose && begin i % 100 == 0 && @info "Sample $i, T: $(inma.temperature)" end
+        verbose && begin i % 200 == 0 && @info "Sample $i, T: $(inma.temperature)" end
         #Parse data from dump file into inma.ld.data_storage
         parse_next_timestep!(inma.ld, dump_file)
     
@@ -57,6 +57,10 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
                 freqs_sq = freqs_sq, phi = phi,
                 nsamples = i
             )
+
+            if next_checkpoint_idx > length(checkpoints)
+                next_checkpoint_idx = 1 # just set to something we wont see again
+            end
         end
 
         fill!(psi_storage, 0.0f0)
