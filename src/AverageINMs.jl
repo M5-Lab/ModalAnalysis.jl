@@ -17,11 +17,8 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
     dump_file = open(inma.ld.path, "r")
 
     #Calculate indicies to save data to disk
-    checkpoints = (inma.ld.n_samples ÷ ncheckpoints) .* (1:(ncheckpoints-1))
-    next_checkpoint_idx = 1
-    checkpoints_done = false
-
-
+    checkpoints = collect((inma.ld.n_samples ÷ ncheckpoints) .* (1:(ncheckpoints-1)))
+    
     verbose && @info "Starting temp: $(inma.temperature) with $(inma.ld.n_samples) samples and $(ncheckpoints) checkpoints."
     for i in 1:inma.ld.n_samples
         verbose && begin i % 200 == 0 && @info "Sample $i, T: $(inma.temperature)" end
@@ -39,8 +36,7 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
         avg_forces .+= reduce(vcat, eachrow(Matrix(inma.ld.data_storage[!,["fx","fy","fz"]])))
         avg_dynmat .+= dynamical_matrix!(dynmat_storage,s, inma.potential, calc)
 
-        if (i == checkpoints[next_checkpoint_idx]) && !checkpoints_done
-            next_checkpoint_idx += 1
+        if i ∈ checkpoints
             verbose && @info "Saving Checkpoint $i"
 
             #Re-use storage to calculate checkpoint-data
@@ -60,9 +56,6 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
                 nsamples = i
             )
 
-            if next_checkpoint_idx > length(checkpoints)
-                checkpoints_done = true
-            end
         end
 
         fill!(psi_storage, 0.0f0)
