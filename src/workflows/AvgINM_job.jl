@@ -47,6 +47,7 @@ function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures:
 
     n_temps = length(temperatures)
 
+    #* SOMETHING WEIRD PARALLELIZING HERE, THROWS ERRS in EIGEN
     Threads.@threads for chunk_i in 1:ncores
         for i in chunk_i:ncores:n_temps
             temp = temperatures[i]

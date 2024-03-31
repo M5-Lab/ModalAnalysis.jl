@@ -44,7 +44,7 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
             tmp_forces .= avg_forces ./ i
             dynmat_storage .= avg_dynmat ./ i
             psi_storage .= avg_psi ./ i
-            freqs_sq, phi = get_modes(dynmat_storage)
+            # freqs_sq, phi = get_modes(dynmat_storage)
 
             checkpoint_dir = joinpath(inma.simulation_folder, "AvgINM_Checkpoint$(checkpoint_counter)")
             mkpath(checkpoint_dir)
@@ -53,7 +53,6 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
                 f0 = tmp_forces,
                 dynmat = dynmat_storage, 
                 F3 = psi_storage,
-                freqs_sq = freqs_sq, phi = phi,
                 nsamples = i
             )
 
