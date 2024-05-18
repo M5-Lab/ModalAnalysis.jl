@@ -60,12 +60,11 @@ function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures:
                  verbose = verbose, ncheckpoints = ncheckpoints,
                  filename = outfilename(temp) * ".jld2")
 
-            freqs_sq, phi = get_modes(avg_dynmat)
+            # freqs_sq, phi = get_modes(avg_dynmat)
 
             jldsave(joinpath(out_path, outfilename(temp) * ".jld2"), 
                 f0 = avg_forces, dynmat = avg_dynmat, 
-                F3 = avg_psi, freqs_sq = freqs_sq, phi = phi,
-                nsamples = inma.ld.n_samples
+                F3 = avg_psi, nsamples = inma.ld.n_samples
             )
             @info "Finished temperature: $(temp)"
         end
