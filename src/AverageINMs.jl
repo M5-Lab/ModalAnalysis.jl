@@ -8,9 +8,9 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
     N_atoms = n_atoms(get_sys(inma))
     N_modes = 3*N_atoms
     avg_psi = zeros(T, N_modes, N_modes, N_modes)
-    psi_storage = similar(avg_psi)
+    psi_storage = zeros(T, N_modes, N_modes, N_modes)
     avg_dynmat = zeros(T, N_modes, N_modes)
-    dynmat_storage = similar(avg_dynmat)
+    dynmat_storage = zeros(T, N_modes, N_modes)
     avg_forces = zeros(T, N_modes)
     tmp_forces = zeros(T, N_modes)
     
@@ -30,10 +30,10 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
         box_sizes = [inma.ld.header_data["L_x"][2], inma.ld.header_data["L_y"][2], inma.ld.header_data["L_z"][2]]
         s = SuperCellSystem(inma.ld.data_storage, inma.atom_masses, box_sizes, "x", "y", "z")
         
-        avg_psi .+= third_order!(psi_storage, s, inma.potential, calc)
+        @views avg_psi .+= third_order!(psi_storage, s, inma.potential, calc)
 
-        avg_forces .+= reduce(vcat, eachrow(Matrix(inma.ld.data_storage[!,["fx","fy","fz"]])))
-        avg_dynmat .+= dynamical_matrix!(dynmat_storage, s, inma.potential, calc)
+        @views avg_forces .+= reduce(vcat, eachrow(Matrix(inma.ld.data_storage[!,["fx","fy","fz"]])))
+        @views avg_dynmat .+= dynamical_matrix!(dynmat_storage, s, inma.potential, calc)
 
         if i ∈ checkpoints
             verbose && @info "Saving Checkpoint $i"
