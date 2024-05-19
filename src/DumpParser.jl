@@ -95,14 +95,14 @@ end
 """
 Parse next timestep from `io` and stores it in `ld`. 
 """
-function parse_next_timestep!(ld::LammpsDump, io::IOStream)
+function parse_next_timestep!(ld::LammpsDump, io::IOStream; float_type::Type = Float64)
     
     #Skip header 
     for _ in range(1, ld.header_length) readline(io) end
 
     #Parse atom data
     for j in range(1, ld.header_data["N_atoms"])
-        ld.data_storage[j,:] .= parse.(Float64, split(strip(readline(io))))
+        ld.data_storage[j,:] .= parse.(float_type, split(strip(readline(io))))
     end
 
     return ld, io

@@ -36,12 +36,12 @@ This function calculates the averaged instantaneous force constants for a given 
 """
 function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures::AbstractVector{<:Real},
             sim_base_path::String, sim_folder_name::Function, out_path::String, N_atoms::Integer,
-            outfilename::Function; ncores = Threads.nthreads(), verbose = false, ncheckpoints = 1)
+            outfilename::Function; ncores = Threads.nthreads(), verbose = false, ncheckpoints = 1, T = Float32)
 
     N_IFC3 = (3*N_atoms)^3
-    N_bytes_IFC3 = sizeof(Float64)*N_IFC3
+    N_bytes_IFC3 = sizeof(T)*N_IFC3
     N_GB_total = 2*N_bytes_IFC3*ncores/(1024^3) #code stores 2 copies of IFC3 in mem
-    total_mem_GB = Float32(Sys.total_memory())/(1024^3)
+    total_mem_GB = T(Sys.total_memory())/(1024^3)
     @assert total_mem_GB > 1.1*N_GB_total "Not enough memory to use $(ncores) cores.
          $(N_GB_total) GB needed, $(total_mem_GB) GB available."
 
@@ -54,11 +54,11 @@ function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures:
             @info "Starting temperature: $(temp)"
             seed_path = joinpath(sim_base_path, sim_folder_name(temp))
 
-            inma = InstantaneousNormalModeAnalysis(seed_path, pot, temp, calc)
+            inma = InstantaneousNormalModeAnalysis(seed_path, pot, temp, calc; req_img_flags = false)
 
             avg_forces, avg_dynmat, avg_psi = get_average_INMs(inma, calc;
                  verbose = verbose, ncheckpoints = ncheckpoints,
-                 filename = outfilename(temp) * ".jld2")
+                 filename = outfilename(temp) * ".jld2", T = T)
 
             # freqs_sq, phi = get_modes(avg_dynmat)
 
