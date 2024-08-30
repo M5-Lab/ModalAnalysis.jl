@@ -1,18 +1,18 @@
 export get_average_INMs
 
 #cannot be parallelized easily with my existing infastructure
-#ASSUMES 3D SYSTEM
+#ASSUMES 3D SYSTEM, and everything passed is float32
 function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceConstantCalculator;
-    verbose::Bool = true, ncheckpoints::Int = 1, filename = "AvgINM.jld2")
+    verbose::Bool = true, ncheckpoints::Int = 1, filename = "AvgINM.jld2", T = Float32)
 
     N_atoms = n_atoms(get_sys(inma))
     N_modes = 3*N_atoms
-    avg_psi = zeros(Float32, N_modes, N_modes, N_modes)
-    psi_storage = similar(avg_psi)
-    avg_dynmat = zeros(Float32, N_modes, N_modes)
-    dynmat_storage = similar(avg_dynmat)
-    avg_forces = zeros(Float32, N_modes)
-    tmp_forces = zeros(Float32, N_modes)
+    avg_psi = zeros(T, N_modes, N_modes, N_modes)
+    psi_storage = zeros(T, N_modes, N_modes, N_modes)
+    avg_dynmat = zeros(T, N_modes, N_modes)
+    dynmat_storage = zeros(T, N_modes, N_modes)
+    avg_forces = zeros(T, N_modes)
+    tmp_forces = zeros(T, N_modes)
     
     dump_file = open(inma.ld.path, "r")
 
@@ -22,23 +22,22 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
 
     verbose && @info "Starting temp: $(inma.temperature) with $(inma.ld.n_samples) samples and $(ncheckpoints) checkpoints."
     for i in 1:inma.ld.n_samples
-        verbose && begin i % 200 == 0 && @info "Sample $i, T: $(inma.temperature)" end
+        verbose && begin i % 50 == 0 && @info "Sample $i, T: $(inma.temperature)" end
         #Parse data from dump file into inma.ld.data_storage
-        parse_next_timestep!(inma.ld, dump_file)
+        parse_next_timestep!(inma.ld, dump_file, float_type = T)
     
         #Update positions in inma
-        s = get_sys(inma)
         box_sizes = [inma.ld.header_data["L_x"][2], inma.ld.header_data["L_y"][2], inma.ld.header_data["L_z"][2]]
         s = SuperCellSystem(inma.ld.data_storage, inma.atom_masses, box_sizes, "x", "y", "z")
         
-        #* Probably silently casting from FLoat64 to 32
-        avg_psi .+= third_order!(psi_storage, s, inma.potential, calc)
+        @views avg_psi .+= third_order!(psi_storage, s, inma.potential, calc)
 
-        avg_forces .+= reduce(vcat, eachrow(Matrix(inma.ld.data_storage[!,["fx","fy","fz"]])))
-        avg_dynmat .+= dynamical_matrix!(dynmat_storage,s, inma.potential, calc)
+        @views avg_forces .+= reduce(vcat, eachrow(Matrix(inma.ld.data_storage[!,["fx","fy","fz"]])))
+        @views avg_dynmat .+= dynamical_matrix!(dynmat_storage, s, inma.potential, calc)
 
         if i ∈ checkpoints
             verbose && @info "Saving Checkpoint $i"
+            @assert i != 0 "Bug in checkpointing code. Checkpointing at 0th sample."
 
             #Re-use storage to calculate checkpoint-data
             tmp_forces .= avg_forces ./ i
@@ -57,12 +56,10 @@ function get_average_INMs(inma::InstantaneousNormalModeAnalysis, calc::ForceCons
             )
 
             checkpoint_counter += 1
-
         end
 
-        fill!(psi_storage, 0.0f0)
-        fill!(dynmat_storage, 0.0f0)
-
+        fill!(psi_storage, T(0.0))
+        fill!(dynmat_storage, T(0.0))
     end
 
     close(dump_file)

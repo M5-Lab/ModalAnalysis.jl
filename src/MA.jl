@@ -81,13 +81,17 @@ mutable struct InstantaneousNormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm
     reference_sys::SuperCellSystem
 end
 
-function InstantaneousNormalModeAnalysis(simulation_folder, pot, temperature, calc)
+function InstantaneousNormalModeAnalysis(simulation_folder, pot, temperature, calc; req_img_flags = true)
     atom_masses, pot_eng_MD, T_avg, eq, ld = parse_simulation_data(simulation_folder)
     check_temp(temperature, T_avg)
     #T_avg *= unit(temperature)
 
-    @assert issubset(["x","y","z","fx","fy","fz","ix","iy","iz"], ld.header_data["fields"]) "INMA dump data needs x,y,z,fx,fy,fz,ix,iy,iz fields"
-
+    if req_img_flags
+        @assert issubset(["x","y","z","fx","fy","fz","ix","iy","iz"], ld.header_data["fields"]) "INMA dump data needs x,y,z,fx,fy,fz,ix,iy,iz fields"
+    else
+        @assert issubset(["x","y","z","fx","fy","fz"], ld.header_data["fields"]) "INMA dump data needs x,y,z,fx,fy,fz fields when req_img_flags = false"
+    end
+    
     box_sizes = [ld.header_data["L_x"][2], ld.header_data["L_y"][2], ld.header_data["L_z"][2]]
     sys = SuperCellSystem(eq.data_storage, atom_masses, box_sizes, "x", "y", "z")
 
