@@ -118,6 +118,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, 
         file["mode_potential_energy"] = mode_potential_energy
         file["total_eng_NM"] = total_eng_NM
         file["pot_eng_MD"] = nma.pot_eng_MD
+        file["order"] = order
     end
 
 
@@ -127,6 +128,7 @@ end
 
 
 function NMA_loop(nma::MonteCarloNormalModeAnalysis, out_path::String, freqs_sq, phi, K3, U_TEP3_func::Function, order::Int)
+    
     if order < 2
         error("Order must be 2 or 3")
     elseif order >=4 
@@ -181,6 +183,7 @@ function NMA_loop(nma::MonteCarloNormalModeAnalysis, out_path::String, freqs_sq,
         file["mode_potential_energy"] = mode_potential_energy
         file["total_eng_NM"] = total_eng_NM
         file["pot_eng_MD"] = nma.pot_eng_MD
+        file["order"] = order
     end
 
     return nothing

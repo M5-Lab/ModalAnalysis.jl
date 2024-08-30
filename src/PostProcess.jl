@@ -7,8 +7,8 @@ function NM_postprocess(nma::NormalModeAnalysis, kB; nthreads::Integer = Threads
     energies_path = joinpath(nma.simulation_folder, "ModeEnergies.jld2")
     tep_path = joinpath(nma.simulation_folder, "TEP.jld2")
 
-    potential_eng_MD, potential_eng_TEP, mode_potential_order3 =
-        load(energies_path, "pot_eng_MD", "total_eng_NM", "mode_potential_order3")
+    potential_eng_MD, potential_eng_TEP, mode_potential_energy =
+        load(energies_path, "pot_eng_MD", "total_eng_NM", "mode_potential_energy")
     freqs_sq = load(tep_path, "freqs_sq")
  
     N_modes = length(freqs_sq)
@@ -25,7 +25,7 @@ function NM_postprocess(nma::NormalModeAnalysis, kB; nthreads::Integer = Threads
     cv_TEP_total = var(potential_eng_TEP)/(kB*T*T)
 
     cv3_cov, cv3_per_mode, cv3_total = 
-        build_cov_matrix(mode_potential_order3, N_modes, nthreads, kB, T)
+        build_cov_matrix(mode_potential_energy, N_modes, nthreads, kB, T)
 
 
     if average_identical_freqs

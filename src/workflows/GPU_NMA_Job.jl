@@ -49,7 +49,7 @@ function NMA_GPU_Jobs(sim_folder::String, TEP_folder::String, temperatures::Abst
      sim_folder_name::Function, tep_file_name::Function, n_seeds::Integer, pot::Potential;
      other_params_to_sweep::Dict{String, <:AbstractVector{<:Real}} = Dict{String, AbstractVector{<:Real}}(),
      gpu_ids = CUDA.devices(), ncores = Threads.nthreads(), mcc_block_size::Union{Integer, Nothing} = nothing,
-     avg_identical_freqs = false, order = 3)
+     avg_identical_freqs = false, order::Int = 3)
 
     if energy_unit(pot) == u"eV"
         kB = ustrip(u"eV/K", Unitful.k)
