@@ -1,8 +1,8 @@
 export run
 
 """
-    run(nma::NormalModeAnalysis, mcc_block_size::Integer = nothing)
-    run(nma::NormalModeAnalysis, TEP_path::String, energy_block_size::Integer = nothing)
+    run(nma::NormalModeAnalysis, mcc_block_size::Integer = nothing, order::Int = 3)
+    run(nma::NormalModeAnalysis, TEP_path::String, energy_block_size::Integer = nothing, order::Int = 3)
 """
 
 # Calculate MCC fresh

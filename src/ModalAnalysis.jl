@@ -11,7 +11,7 @@ using DelimitedFiles
 using Unitful
 
 using ThreadPinning
-ThreadPinning.Prefs.set_os_warning(false)
+# ThreadPinning.Prefs.set_os_warning(false)
 pinthreads(:cores)
 
 
