@@ -6,7 +6,7 @@ export run
 """
 
 # Calculate MCC fresh
-function run(nma::NormalModeAnalysis, mcc_block_size::Union{Integer, Nothing} = nothing)
+function run(nma::NormalModeAnalysis, mcc_block_size::Union{Integer, Nothing} = nothing, order::Int = 3)
 
     @assert nma.calc !== nothing "ForceConstantCalculator not passed to nma class"
 
@@ -25,7 +25,7 @@ function run(nma::NormalModeAnalysis, mcc_block_size::Union{Integer, Nothing} = 
         file["dynmat"] = dynmat.values
     end
 
-    NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3, U_TEP3_n_CUDA)
+    NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3, U_TEP3_n_CUDA, order)
 
     return nothing
 end
@@ -33,7 +33,7 @@ end
 
 #Re-use MCC from a previous simulation
 function run(nma::Union{NormalModeAnalysis, MonteCarloNormalModeAnalysis},
-     TEP_path::String, energy_block_size::Union{Integer, Nothing} = nothing)
+     TEP_path::String, energy_block_size::Union{Integer, Nothing} = nothing, order::Int = 3)
     
     f = jldopen(TEP_path, "r"; parallel_read = true)
     freqs_sq = f["freqs_sq"]
@@ -50,10 +50,10 @@ function run(nma::Union{NormalModeAnalysis, MonteCarloNormalModeAnalysis},
     end
 
     if energy_block_size === nothing
-        NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3, U_TEP3_n_CUDA)
+        NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3, U_TEP3_n_CUDA, order)
     else
         U_TEP3_function = (cuK3, cuQ) -> U_TEP3_n_CUDA(cuK3, cuQ, energy_block_size)
-        NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3, U_TEP3_function)
+        NMA_loop(nma, nma.simulation_folder, freqs_sq, phi, K3, U_TEP3_function, order)
     end
 
 
@@ -61,7 +61,13 @@ function run(nma::Union{NormalModeAnalysis, MonteCarloNormalModeAnalysis},
 end 
 
 
-function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, U_TEP3_func::Function)
+function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, U_TEP3_func::Function, order::Int)
+
+    if order < 2
+        error("Order must be 2 or 3")
+    elseif order >=4 
+        error("Order must be 2 or 3")
+    end
 
     N_modes = length(freqs_sq)
     N_atoms = length(nma.atom_masses)
@@ -82,7 +88,7 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, 
     current_positions = zeros(size(initial_positions))
     
     #Pre-allocate output arrays
-    mode_potential_order3 = zeros(N_modes, nma.ld.n_samples)
+    mode_potential_energy = zeros(N_modes, nma.ld.n_samples)
     total_eng_NM = zeros(nma.ld.n_samples)
 
     for i in 1:nma.ld.n_samples
@@ -100,12 +106,16 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, 
         copyto!(cuQ, q)
 
         #Calculate energy from INMs at timestep i
-        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_func(cuK3, cuQ)) #&slowest step, can I make TensorOpt faster? just do on CPU
-        total_eng_NM[i] = @views sum(mode_potential_order3[:,i]) + nma.eq_pot_eng
+        mode_potential_energy[:,i] .= 0.5.*(freqs_sq .* (q.^2))
+        if order == 3
+            mode_potential_energy[:,i] .+= Array(U_TEP3_func(cuK3, cuQ))
+        end
+        # mode_potential_energy[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_func(cuK3, cuQ))
+        total_eng_NM[i] = @views sum(mode_potential_energy[:,i]) + nma.eq_pot_eng
     end 
 
     jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w"; compress = true) do file
-        file["mode_potential_order3"] = mode_potential_order3
+        file["mode_potential_energy"] = mode_potential_energy
         file["total_eng_NM"] = total_eng_NM
         file["pot_eng_MD"] = nma.pot_eng_MD
     end
@@ -116,7 +126,12 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, 
 end
 
 
-function NMA_loop(nma::MonteCarloNormalModeAnalysis, out_path::String, freqs_sq, phi, K3, U_TEP3_func::Function)
+function NMA_loop(nma::MonteCarloNormalModeAnalysis, out_path::String, freqs_sq, phi, K3, U_TEP3_func::Function, order::Int)
+    if order < 2
+        error("Order must be 2 or 3")
+    elseif order >=4 
+        error("Order must be 2 or 3")
+    end
 
     N_modes = length(freqs_sq)
     N_atoms = length(nma.atom_masses)
@@ -135,10 +150,10 @@ function NMA_loop(nma::MonteCarloNormalModeAnalysis, out_path::String, freqs_sq,
     current_positions = zeros(size(initial_positions))
     
     #Pre-allocate output arrays
-    mode_potential_order3 = zeros(N_modes, sim.n_steps)
+    mode_potential_energy = zeros(N_modes, nma.sim.n_steps)
     total_eng_NM = zeros(sim.n_steps)
 
-    for i in 1:sim.n_steps
+    for i in 1:nma.sim.n_steps
 
         parse_next_timestep!(current_positions, nma, dump_file, posn_cols)
         
@@ -153,13 +168,17 @@ function NMA_loop(nma::MonteCarloNormalModeAnalysis, out_path::String, freqs_sq,
         copyto!(cuQ, q)
 
         #Calculate energy from INMs at timestep i
-        mode_potential_order3[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_func(cuK3, cuQ))
-        total_eng_NM[i] = @views sum(mode_potential_order3[:,i])
+        mode_potential_energy[:,i] .= 0.5.*(freqs_sq .* (q.^2))
+        if order == 3
+            mode_potential_energy[:,i] .+= Array(U_TEP3_func(cuK3, cuQ))
+        end
+        # mode_potential_energy[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_func(cuK3, cuQ))
+        total_eng_NM[i] = @views sum(mode_potential_energy[:,i])
     end
 
 
     jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w"; compress = true) do file
-        file["mode_potential_order3"] = mode_potential_order3
+        file["mode_potential_energy"] = mode_potential_energy
         file["total_eng_NM"] = total_eng_NM
         file["pot_eng_MD"] = nma.pot_eng_MD
     end
