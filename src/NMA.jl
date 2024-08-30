@@ -1,12 +1,12 @@
 export run
 
 """
-    run(nma::NormalModeAnalysis, mcc_block_size::Integer = nothing, order::Int = 3)
-    run(nma::NormalModeAnalysis, TEP_path::String, energy_block_size::Integer = nothing, order::Int = 3)
+    run(nma::NormalModeAnalysis; mcc_block_size::Integer = nothing, order::Int = 3)
+    run(nma::NormalModeAnalysis, TEP_path::String; energy_block_size::Integer = nothing, order::Int = 3)
 """
 
 # Calculate MCC fresh
-function run(nma::NormalModeAnalysis, mcc_block_size::Union{Integer, Nothing} = nothing, order::Int = 3)
+function run(nma::NormalModeAnalysis; mcc_block_size::Union{Integer, Nothing} = nothing, order::Int = 3)
 
     @assert nma.calc !== nothing "ForceConstantCalculator not passed to nma class"
 
@@ -33,7 +33,7 @@ end
 
 #Re-use MCC from a previous simulation
 function run(nma::Union{NormalModeAnalysis, MonteCarloNormalModeAnalysis},
-     TEP_path::String, energy_block_size::Union{Integer, Nothing} = nothing, order::Int = 3)
+     TEP_path::String; energy_block_size::Union{Integer, Nothing} = nothing, order::Int = 3)
     
     f = jldopen(TEP_path, "r"; parallel_read = true)
     freqs_sq = f["freqs_sq"]
