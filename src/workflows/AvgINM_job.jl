@@ -47,8 +47,8 @@ function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures:
 
     n_temps = length(temperatures)
 
-    #* SOMETHING WEIRD PARALLELIZING HERE, THROWS ERRS in EIGEN
-    Threads.@threads for chunk_i in 1:ncores
+    #* probably shouldnt parallelize this since dynmat, F3 use threads as well
+    Threads.@threads for chunk_i in 1:ncores 
         for i in chunk_i:ncores:n_temps
             temp = temperatures[i]
             @info "Starting temperature: $(temp)"
@@ -58,11 +58,11 @@ function AvgINM_Job(pot::Potential, calc::ForceConstantCalculator, temperatures:
 
             avg_forces, avg_dynmat, avg_psi = get_average_INMs(inma, calc;
                  verbose = verbose, ncheckpoints = ncheckpoints,
-                 filename = outfilename(temp) * ".jld2", T = T)
+                 filename = outfilename(temp), T = T)
 
             # freqs_sq, phi = get_modes(avg_dynmat)
 
-            jldsave(joinpath(out_path, outfilename(temp) * ".jld2"), 
+            jldsave(joinpath(out_path, outfilename(temp) * "_N$(inma.ld.n_samples)" * ".jld2"), 
                 f0 = avg_forces, dynmat = avg_dynmat, 
                 F3 = avg_psi, nsamples = inma.ld.n_samples
             )
