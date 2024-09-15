@@ -1,4 +1,4 @@
-
+export SelfConsistentLoopJob
 
 ###
 # 1. Calculate 0K force constants
@@ -21,7 +21,7 @@ Perform a self-consistent loop to calculate temperature dependent IFCs.
 - `mode::Symbol`: Statistics to use, `:quantum` or `:classical`.
 """
 function SelfConsistentLoopJob(sys_eq::SuperCellSystem, temperatures::AbstractVector{<:Real},
-                                pot::Potential, outpath::String;
+                                pot::Potential, n_configs::Int, outpath::String;
                                 mode = :quantum, ncores = Threads.nthreads())
 
     if mode ∉ [:quantum, :classical]
@@ -30,7 +30,7 @@ function SelfConsistentLoopJob(sys_eq::SuperCellSystem, temperatures::AbstractVe
 
     @tasks for temp in temperatures
         @set ntasks = ncores
-        self_consistent_IFC_loop(sys_eq, temp, pot, outpath; mode = mode)
+        self_consistent_IFC_loop(sys_eq, temp, pot, n_configs, outpath, mode)
     end
 
 end
