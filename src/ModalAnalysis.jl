@@ -9,6 +9,8 @@ using StatsBase
 using CUDA
 using DelimitedFiles
 using Unitful
+using OhMyThreads
+using Random
 
 using ThreadPinning
 # ThreadPinning.Prefs.set_os_warning(false)
@@ -50,6 +52,7 @@ include("NMA.jl")
 include("INMA.jl")
 include("PostProcess.jl")
 include("AverageINMs.jl")
+include("SelfConsistentLoop.jl")
 
 include("./workflows/GPU_NMA_Job.jl")
 include("./workflows/MonteCarloJobs.jl")

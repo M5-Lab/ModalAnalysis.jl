@@ -1,4 +1,3 @@
-using Random
 
 
 function bose_einstein(freq, temp, kB, hbar)
@@ -17,9 +16,8 @@ function classical_amplitude(freq, mass, kB, temp)
     return sqrt((kB*temp)/mass) / freq
 end
 
-function self_consistent_IFC_loop(sys_eq::SuperCellSystem{D}, calc::ForceConsatntCalculator,
-                                  temp::Real, pot::Potential, n_configs::Int, 
-                                  outpath::String, mode::Symbol) where D
+function self_consistent_IFC_loop(sys_eq::SuperCellSystem, calc::ForceConstantCalculator,
+                                  temp, pot::Potential, n_configs::Int, mode::Symbol) where D
 
     N_atoms = n_atoms(sys_eq)
     N_dof = D * N_atoms
@@ -29,11 +27,12 @@ function self_consistent_IFC_loop(sys_eq::SuperCellSystem{D}, calc::ForceConsatn
 
     # Calculate 0K IFCs to initialize loop
     dynmat = dynamical_matrix(sys_eq, pot, calc)
-    fres_sq, phi = get_modes(dynmat, D)
-    freqs = sqrt.(Complex.(fres_sq))
+    T = eltype(dynmat)
+    freqs_sq, phi = get_modes(dynmat, D)
+    freqs = sqrt.(Complex.(freqs_sq))
 
-    # Create version of masses that is D * N_atoms long
     atom_masses = masses(sys_eq)
+    box_sizes = copy(box_sizes(sys_eq))
 
     # Figure out proper units for constants
     if energy_unit(pot) == u"eV"
@@ -46,14 +45,15 @@ function self_consistent_IFC_loop(sys_eq::SuperCellSystem{D}, calc::ForceConsatn
         error("Unknown unit system")
     end
 
-    configs = zeros(Float32, N_dof, n_configs)
+    # all_configs = zeros(Float32, N_dof, n_configs)
+    current_config = zeros(Float32, N_atoms, 3)
+    U = zeros(n_configs)
     
     for n in 1:n_configs
 
+        # Generate configurations with current set of IFCs
         for i in 1:N_atoms
             for α in 1:D
-                ii = D*(i-1) + α
-
                 for m in 1:N_modes
                     if mode == :quantum
                         A = quantum_amplitude(freqs[m], atom_masses[i], temp, hbar)
@@ -63,12 +63,22 @@ function self_consistent_IFC_loop(sys_eq::SuperCellSystem{D}, calc::ForceConsatn
                         error("Unknown mode")
                     end
 
-                    @views configs[ii, n] = A * z[m, n] * phi[ii, m]
+                    # @views configs[ii, n] = A * z[m, n] * phi[ii, m]
+                    @views current_config[i, α] = A * z[m, n] * phi[ii, m]
                 end
             end
         end
 
+        # Update IFCs
+        fill!(dynmat, T(0.0))
+        sys = SuperCellSystem(current_config, atom_maxxes, box_sizes)
+        dynmat = dynamical_matrix!(dynmat, sys, pot, calc)
+        fres_sq, phi = get_modes(dynmat, D) #*allocates
+        freqs .= sqrt.(Complex.(fres_sq))
 
+        # Calculate convergence metric
+        #& does z[m,n] * phi[ii,m] = q_n
+        # U[n] = 0.5 * (trans)
     end
     
     return configs

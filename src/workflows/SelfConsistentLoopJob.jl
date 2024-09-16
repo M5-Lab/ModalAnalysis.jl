@@ -21,16 +21,18 @@ Perform a self-consistent loop to calculate temperature dependent IFCs.
 - `mode::Symbol`: Statistics to use, `:quantum` or `:classical`.
 """
 function SelfConsistentLoopJob(sys_eq::SuperCellSystem, temperatures::AbstractVector{<:Real},
-                                pot::Potential, n_configs::Int, outpath::String;
-                                mode = :quantum, ncores = Threads.nthreads())
+                                calc::ForceConstantCalculator, pot::Potential, n_configs::Int,
+                                outpath::String;  mode = :quantum, ncores = Threads.nthreads())
 
     if mode ∉ [:quantum, :classical]
         error("mode must be :quantum or :classical")
     end
 
-    @tasks for temp in temperatures
-        @set ntasks = ncores
-        self_consistent_IFC_loop(sys_eq, temp, pot, n_configs, outpath, mode)
+    # @tasks for temp in temperatures
+    for temp in temperatures
+        # @set ntasks = ncores
+        @info "Calculating Configurations for $temp K"
+        configs = self_consistent_IFC_loop(sys_eq, calc, temp, pot, n_configs, mode)
     end
 
 end
