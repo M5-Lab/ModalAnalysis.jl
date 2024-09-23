@@ -20,19 +20,25 @@ Perform a self-consistent loop to calculate temperature dependent IFCs.
 - `outpath::String`: Path to save output files.
 - `mode::Symbol`: Statistics to use, `:quantum` or `:classical`.
 """
-function SelfConsistentLoopJob(sys_eq::SuperCellSystem, temperatures::AbstractVector{<:Real},
+function SelfConsistentLoopJob(sys_eq::SuperCellSystem, temperatures::AbstractVector,
                                 calc::ForceConstantCalculator, pot::Potential, n_configs::Int,
-                                outpath::String;  mode = :quantum, ncores = Threads.nthreads())
+                                n_iters::Int, outpath::String;  mode = :quantum, ncores = Threads.nthreads())
 
     if mode ∉ [:quantum, :classical]
         error("mode must be :quantum or :classical")
     end
 
+    all_configs = Vector{Result{SelfConsistentConfigs, ImaginaryModeError}}(undef, length(temperatures))
+
     # @tasks for temp in temperatures
-    for temp in temperatures
+    for (i,temp) in enumerate(temperatures)
         # @set ntasks = ncores
         @info "Calculating Configurations for $temp K"
-        configs = self_consistent_IFC_loop(sys_eq, calc, temp, pot, n_configs, mode)
+        all_configs[i] = self_consistent_IFC_loop(sys_eq, calc, temp, pot, n_configs, n_iters, mode)
+
+        if typeof(all_configs[i]) == ImaginaryModeError
+            @warn all_configs[i].msg
+        end
     end
 
 end
