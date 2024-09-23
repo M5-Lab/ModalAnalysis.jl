@@ -10,9 +10,10 @@ using CUDA
 using DelimitedFiles
 using Unitful
 
-using ThreadPinning
-# ThreadPinning.Prefs.set_os_warning(false)
-pinthreads(:cores)
+@static if Sys.islinux()
+	using ThreadPinning
+	pinthreads(:cores)
+end
 
 
 #If add KS test back need HypothesisTests, Images
