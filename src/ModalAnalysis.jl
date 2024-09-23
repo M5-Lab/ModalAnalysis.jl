@@ -12,12 +12,10 @@ using Unitful
 using OhMyThreads
 using Random
 
-using ThreadPinning
-# ThreadPinning.Prefs.set_os_warning(false)
-pinthreads(:cores)
-
-
-#If add KS test back need HypothesisTests, Images
+@static if Sys.islinux()
+	using ThreadPinning
+	pinthreads(:cores)
+end
 
 #TODO: register online
 using ForceConstants

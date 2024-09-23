@@ -45,8 +45,8 @@ function self_consistent_IFC_loop(sys_eq::SuperCellSystem, calc::ForceConstantCa
         error("Unknown unit system")
     end
 
-    # all_configs = zeros(Float32, N_dof, n_configs)
-    current_config = zeros(Float32, N_atoms, 3)
+    all_configs = zeros(Float32, N_dof, n_configs)
+    # current_config = zeros(Float32, N_atoms, 3)
     U = zeros(n_configs)
     
     for n in 1:n_configs
@@ -54,6 +54,7 @@ function self_consistent_IFC_loop(sys_eq::SuperCellSystem, calc::ForceConstantCa
         # Generate configurations with current set of IFCs
         for i in 1:N_atoms
             for α in 1:D
+                ii = D*(i-1) + α
                 for m in 1:N_modes
                     if mode == :quantum
                         A = quantum_amplitude(freqs[m], atom_masses[i], temp, hbar)
@@ -63,18 +64,18 @@ function self_consistent_IFC_loop(sys_eq::SuperCellSystem, calc::ForceConstantCa
                         error("Unknown mode")
                     end
 
-                    # @views configs[ii, n] = A * z[m, n] * phi[ii, m]
-                    @views current_config[i, α] = A * z[m, n] * phi[ii, m]
+                    @views configs[ii, n] = A * z[m, n] * phi[ii, m]
+                    # @views current_config[i, α] = A * z[m, n] * phi[ii, m]
                 end
             end
         end
 
-        # Update IFCs
-        fill!(dynmat, T(0.0))
-        sys = SuperCellSystem(current_config, atom_maxxes, box_sizes)
-        dynmat = dynamical_matrix!(dynmat, sys, pot, calc)
-        fres_sq, phi = get_modes(dynmat, D) #*allocates
-        freqs .= sqrt.(Complex.(fres_sq))
+        # # Update IFCs
+        # fill!(dynmat, T(0.0))
+        # sys = SuperCellSystem(current_config, atom_maxxes, box_sizes)
+        # dynmat = dynamical_matrix!(dynmat, sys, pot, calc)
+        # fres_sq, phi = get_modes(dynmat, D) #*allocates
+        # freqs .= sqrt.(Complex.(fres_sq))
 
         # Calculate convergence metric
         #& does z[m,n] * phi[ii,m] = q_n
