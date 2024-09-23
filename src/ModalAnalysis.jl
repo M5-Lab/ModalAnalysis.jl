@@ -24,24 +24,24 @@ module TEP
     using ForceConstants
     using TensorOperations
     using CUDA, cuTENSOR
-    using LoopVectorization
+    # using LoopVectorization
 
     include("./TEP/TEP.jl")
-    include("./TEP/DeltaTEP.jl")
+    # include("./TEP/DeltaTEP.jl")
 end
 using .TEP
 
-module MonteCarloHeatCapacity
-    using ForceConstants
-    using Distributions
-    using Unitful
-    using StatsBase
-    using DataFrames
-    using JLD2
-    using ..TEP
-    include("./MonteCarloHeatCapacity/MonteCarlo.jl")
-end
-using .MonteCarloHeatCapacity
+# module MonteCarloHeatCapacity
+#     using ForceConstants
+#     using Distributions
+#     using Unitful
+#     using StatsBase
+#     using DataFrames
+#     using JLD2
+#     using ..TEP
+#     include("./MonteCarloHeatCapacity/MonteCarlo.jl")
+# end
+# using .MonteCarloHeatCapacity
 
 
 include("DumpParser.jl")
@@ -53,7 +53,7 @@ include("AverageINMs.jl")
 include("SelfConsistentLoop.jl")
 
 include("./workflows/GPU_NMA_Job.jl")
-include("./workflows/MonteCarloJobs.jl")
+# include("./workflows/MonteCarloJobs.jl")
 include("./workflows/AvgINM_job.jl")
 include("./workflows/SelfConsistentLoopJob.jl")
 

@@ -16,7 +16,7 @@ function classical_amplitude(freq, mass, kB, temp)
     return sqrt((kB*temp)/mass) / freq
 end
 
-function self_consistent_IFC_loop(sys_eq::SuperCellSystem, calc::ForceConstantCalculator,
+function self_consistent_IFC_loop(sys_eq::SuperCellSystem{D}, calc::ForceConstantCalculator,
                                   temp, pot::Potential, n_configs::Int, mode::Symbol) where D
 
     N_atoms = n_atoms(sys_eq)

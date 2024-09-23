@@ -32,7 +32,8 @@ end
 
 
 #Re-use MCC from a previous simulation
-function run(nma::Union{NormalModeAnalysis, MonteCarloNormalModeAnalysis},
+# could be nma::Union{NormalModeAnalysis, MonteCarloNormalModeAnalysis
+function run(nma::NormalModeAnalysis,
      TEP_path::String; energy_block_size::Union{Integer, Nothing} = nothing, order::Int = 3)
     
     f = jldopen(TEP_path, "r"; parallel_read = true)
@@ -127,65 +128,65 @@ function NMA_loop(nma::NormalModeAnalysis, out_path::String, freqs_sq, phi, K3, 
 end
 
 
-function NMA_loop(nma::MonteCarloNormalModeAnalysis, out_path::String, freqs_sq, phi, K3, U_TEP3_func::Function, order::Int)
+# function NMA_loop(nma::MonteCarloNormalModeAnalysis, out_path::String, freqs_sq, phi, K3, U_TEP3_func::Function, order::Int)
     
-    if order < 2
-        error("Order must be 2 or 3")
-    elseif order >=4 
-        error("Order must be 2 or 3")
-    end
+#     if order < 2
+#         error("Order must be 2 or 3")
+#     elseif order >=4 
+#         error("Order must be 2 or 3")
+#     end
 
-    N_modes = length(freqs_sq)
-    N_atoms = length(nma.atom_masses)
+#     N_modes = length(freqs_sq)
+#     N_atoms = length(nma.atom_masses)
 
-    mass_sqrt = sqrt.(nma.atom_masses)
+#     mass_sqrt = sqrt.(nma.atom_masses)
 
-    K3 = Float32.(K3)
-    cuK3 = CUDA.CuArray(K3)
+#     K3 = Float32.(K3)
+#     cuK3 = CUDA.CuArray(K3)
     
-    #Pre-allocate intermediate data_storage
-    disp = zeros(N_atoms, 3); disp_mw = zeros(N_modes)
-    q = zeros(Float32,N_modes)
-    cuQ = CUDA.zeros(N_modes)
+#     #Pre-allocate intermediate data_storage
+#     disp = zeros(N_atoms, 3); disp_mw = zeros(N_modes)
+#     q = zeros(Float32,N_modes)
+#     cuQ = CUDA.zeros(N_modes)
 
-    initial_positions = Matrix(nma.sim.reference_positions)
-    current_positions = zeros(size(initial_positions))
+#     initial_positions = Matrix(nma.sim.reference_positions)
+#     current_positions = zeros(size(initial_positions))
     
-    #Pre-allocate output arrays
-    mode_potential_energy = zeros(N_modes, nma.sim.n_steps)
-    total_eng_NM = zeros(sim.n_steps)
+#     #Pre-allocate output arrays
+#     mode_potential_energy = zeros(N_modes, nma.sim.n_steps)
+#     total_eng_NM = zeros(sim.n_steps)
 
-    for i in 1:nma.sim.n_steps
+#     for i in 1:nma.sim.n_steps
 
-        parse_next_timestep!(current_positions, nma, dump_file, posn_cols)
+#         parse_next_timestep!(current_positions, nma, dump_file, posn_cols)
         
-        #Calculate displacements
-        disp .= current_positions .- initial_positions
+#         #Calculate displacements
+#         disp .= current_positions .- initial_positions
 
-        disp .*= mass_sqrt 
-        disp_mw .= reduce(vcat, eachrow(disp))
+#         disp .*= mass_sqrt 
+#         disp_mw .= reduce(vcat, eachrow(disp))
 
-        #Convert displacements to mode amplitudes.
-        mul!(q, phi', disp_mw)
-        copyto!(cuQ, q)
+#         #Convert displacements to mode amplitudes.
+#         mul!(q, phi', disp_mw)
+#         copyto!(cuQ, q)
 
-        #Calculate energy from INMs at timestep i
-        mode_potential_energy[:,i] .= 0.5.*(freqs_sq .* (q.^2))
-        if order == 3
-            mode_potential_energy[:,i] .+= Array(U_TEP3_func(cuK3, cuQ))
-        end
-        # mode_potential_energy[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_func(cuK3, cuQ))
-        total_eng_NM[i] = @views sum(mode_potential_energy[:,i])
-    end
+#         #Calculate energy from INMs at timestep i
+#         mode_potential_energy[:,i] .= 0.5.*(freqs_sq .* (q.^2))
+#         if order == 3
+#             mode_potential_energy[:,i] .+= Array(U_TEP3_func(cuK3, cuQ))
+#         end
+#         # mode_potential_energy[:,i] .= 0.5.*(freqs_sq .* (q.^2)) .+ Array(U_TEP3_func(cuK3, cuQ))
+#         total_eng_NM[i] = @views sum(mode_potential_energy[:,i])
+#     end
 
 
-    jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w"; compress = true) do file
-        file["mode_potential_energy"] = mode_potential_energy
-        file["total_eng_NM"] = total_eng_NM
-        file["pot_eng_MD"] = nma.pot_eng_MD
-        file["order"] = order
-    end
+#     jldopen(joinpath(out_path, "ModeEnergies.jld2"), "w"; compress = true) do file
+#         file["mode_potential_energy"] = mode_potential_energy
+#         file["total_eng_NM"] = total_eng_NM
+#         file["pot_eng_MD"] = nma.pot_eng_MD
+#         file["order"] = order
+#     end
 
-    return nothing
-end
+#     return nothing
+# end
 

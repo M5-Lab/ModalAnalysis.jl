@@ -58,17 +58,17 @@ end
 
 get_sys(nma::NormalModeAnalysis) = nma.sys
 
-struct MonteCarloNormalModeAnalysis{M} <: ModalAnalysisAlgorithm
-    simulation_folder::String
-    sim::MC_Simulation
-    atom_masses::Vector{M}
-    sys::SuperCellSystem
-end
+# struct MonteCarloNormalModeAnalysis{M} <: ModalAnalysisAlgorithm
+#     simulation_folder::String
+#     sim::MC_Simulation
+#     atom_masses::Vector{M}
+#     sys::SuperCellSystem
+# end
 
-function MonteCarloNormalModeAnalysis(sys, sim, sim_folder)
-    atom_masses = masses(sys)
-    return MonteCarloNormalModeAnalysis{eltype(atom_masses)}(sim_folder, sim, atom_masses, sys)
-end
+# function MonteCarloNormalModeAnalysis(sys, sim, sim_folder)
+#     atom_masses = masses(sys)
+#     return MonteCarloNormalModeAnalysis{eltype(atom_masses)}(sim_folder, sim, atom_masses, sys)
+# end
 
 mutable struct InstantaneousNormalModeAnalysis{T,M} <: ModalAnalysisAlgorithm
     const simulation_folder::String
