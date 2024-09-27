@@ -60,20 +60,23 @@ n_configs(sc::SelfConsistentConfigs) = size(sc.configs, 2)
 
 function self_consistent_IFC_loop(sys_eq::SuperCellSystem{D}, calc::ForceConstantCalculator,
                                   temp, pot::Potential, n_configs::Int, n_iters::Int,
-                                  mode::Symbol; save_every::Int = 25)::Result{SelfConsistentConfigs, ImaginaryModeError} where D
+                                  mode::Symbol; save_every::Int = 25,
+                                  nthreads::Int = Threads.nthreads())::Result{SelfConsistentConfigs, ImaginaryModeError} where D
+
+    @assert length_unit(pot) == unit(positions(sys_eq)[1][1])
 
     N_atoms = n_atoms(sys_eq)
     N_dof = D * N_atoms
 
     # This should never be much more than ~50 MB in practice
     T = Float32
-    z = randn(T, N_dof, n_configs) #* do I need to re-sample this for each atom? 
+    z = randn(T, N_dof, n_configs) #* should this be different per atom or per mode?
 
     # Calculate 0K IFCs to initialize loop
     dynmat = zeros(T, N_dof, N_dof)
     dynamical_matrix!(dynmat, sys_eq, pot, calc)
     freqs_sq, phi = get_modes(dynmat, D)
-    freqs = sqrt.(Complex.(freqs_sq))
+    freqs = sqrt.(Complex.(freqs_sq)) #./ (2π) #* need to divide by 2pi?
 
     # Check for imaginary and 0 frequency modes
     if imaginary_mode_present(freqs)
@@ -84,7 +87,9 @@ function self_consistent_IFC_loop(sys_eq::SuperCellSystem{D}, calc::ForceConstan
     freqs = real(freqs)
 
     atom_masses = ustrip.(masses(sys_eq))
+    eq_positions = ustrip.(reduce(vcat, positions(sys_eq)))
     box_sizes = copy(sys_eq.box_sizes_SC)
+    L_unit = length_unit(pot)
 
     # Figure out proper units for constants
     if energy_unit(pot) == u"eV"
@@ -106,13 +111,16 @@ function self_consistent_IFC_loop(sys_eq::SuperCellSystem{D}, calc::ForceConstan
     freq_checkpoints[:, 1] .= freqs
     checkpoint_idx = 2
     
-    for iter in ProgressBar(1:n_iters, printing_delay = 0.5)
-        for n in 1:n_configs
+    for iter in 1:n_iters
+        bar = ProgressBar(1:n_configs; printing_delay = 0.1)
+        set_description(bar, "Making Configs, Iter: $iter")
+        for n in bar
             # Generate configurations with current set of IFCs
-            for i in 1:N_atoms
-                for α in 1:D
-                    ii = D*(i-1) + α
-                    for m in 1:N_dof
+            @tasks for i in 1:N_atoms 
+                @set ntasks = nthreads
+                for α in 1:D #* could just vectorize over this, since amplitudes are per atom
+                    ii = D*(i-1) + α #atom idx
+                    for m in 1:N_dof #mode idx
 
                         #* IGNORE RIGID TRANSLATION MODES?
                         if m in rtm_idxs
@@ -127,23 +135,27 @@ function self_consistent_IFC_loop(sys_eq::SuperCellSystem{D}, calc::ForceConstan
                             error("Unknown mode")
                         end
 
-                        @views configs[ii, n] = A * z[m, n] * phi[ii, m]
+                        @views configs[ii, n] += (A * z[m, n] * phi[ii, m])
                     end
                 end
-            end 
+            end
+            # Just calculated displacements before, add eq positions to get configuration
+            configs[:, n] .+= eq_positions
         end
-
-         # Calculate tempearture dependent IFCs from generated configurations
         
-        for config in eachcol(configs)
+         # Calculate tempearture dependent IFCs from generated configurations
+        bar = ProgressBar(eachcol(configs), printing_delay = 0.2)
+        set_description(bar, "Calculating AvgIFCs, Iter: $iter")
+        for config in bar
             fill!(dynmat, T(0.0))
-            sys = SuperCellSystem(config, atom_masses, box_sizes)
+            xs = [config[D*(i-1) + 1 : D*i] * L_unit for i in 1:N_atoms]  #*allocates
+            sys = SuperCellSystem(xs, atom_masses, box_sizes)
             avg_dynmat .+= dynamical_matrix!(dynmat, sys, pot, calc)
         end
 
         avg_dynmat ./= n_configs
         fres_sq, phi = get_modes(avg_dynmat, D) #*allocates
-        freqs .= sqrt.(Complex.(fres_sq))
+        freqs .= sqrt.(Complex.(fres_sq)) #./ (2π)
         rtm_idxs .= rigid_translation_modes(freqs, D)
 
 
@@ -154,8 +166,10 @@ function self_consistent_IFC_loop(sys_eq::SuperCellSystem{D}, calc::ForceConstan
         if iter % save_every == 0
             freq_checkpoints[:, checkpoint_idx] .= freqs
         end
-        
+
+        # Reset random numbers
+        randn!(z)
     end
-    
+
     return SelfConsistentConfigs(configs, freq_checkpoints, kB, hbar, temp, n_iters)
 end

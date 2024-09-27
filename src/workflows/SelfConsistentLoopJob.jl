@@ -41,4 +41,5 @@ function SelfConsistentLoopJob(sys_eq::SuperCellSystem, temperatures::AbstractVe
         end
     end
 
+    return all_configs
 end

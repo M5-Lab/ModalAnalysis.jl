@@ -13,6 +13,7 @@ using OhMyThreads
 using Random
 using ProgressBars
 using ResultTypes
+using StaticArrays
 
 @static if Sys.islinux()
 	using ThreadPinning
