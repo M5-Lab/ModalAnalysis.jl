@@ -59,5 +59,6 @@ include("./workflows/GPU_NMA_Job.jl")
 # include("./workflows/MonteCarloJobs.jl")
 include("./workflows/AvgINM_job.jl")
 include("./workflows/SelfConsistentLoopJob.jl")
+include("./workflows/GenerateConfigurations.jl")
 
 end
