@@ -12,7 +12,11 @@ using Pkg
 Pkg.add(url = "https://github.com/M5-Lab/ModalAnalysis.jl.git", rev = "v0.0.1")
 ```
 
-### Using [ForceConstants.jl](https://github.com/ejmeitz/ForceConstants.jl) to generate IFC input. The code below takes the derviative w.r.t. the equilibrium positions defined by `fcc_crystal`. So these are the Zero-Kevlin force constants. However, they are calculated exactly with automatic differentiation instead of the traditional finite differences.
+### Generating IFCs with [ForceConstants.jl](https://github.com/ejmeitz/ForceConstants.jl) 
+The code below takes the derviative w.r.t. the equilibrium positions defined by `fcc_crystal`. So these are the Zero-Kevlin force constants. However, they are calculated exactly with automatic differentiation instead of the traditional finite differences.
+
+The important thing to note is the format of the output. If you want to use external force constants, `ModalAnalysis.jl` expects them as a [JLD2](https://github.com/JuliaIO/JLD2.jl) (similar to HDF5) file with the following keys: `freqs_sq`, `dynmat`, `phi`, `K3`. All entries are dense.
+
 ```julia
 using ForceConstants
 using JLD2
@@ -26,9 +30,9 @@ sys_lj = SuperCellSystem(fcc_crystal);
 tol = 1e-12
 calc_analytical_lj = AnalyticalCalculator(tol, pot_lj.r_cut)
 
+# Calculate dynamical matrix, mode shapes, frequencies, and third-order IFCs
 dynmat = dynamical_matrix(sys_lj, pot_lj, calc_analytical_lj)
 freqs_sq, phi = get_modes(dynmat)
-
 ifc3_analytical = third_order(sys_lj, pot_lj, calc_analytical_lj)
 
 # Modifies values in ifc3_analytical
@@ -67,10 +71,10 @@ n_seeds = 50
 order = 3
 
 pot_sw = StillingerWeberSilicon()
-#pot_lj = LJ(3.4, 0.24037u"kcal/mol", 8.5) #Just need energy units so the code and figure out which kB to use
+#Just need energy units so the code and figure out kB
+#pot_lj = LJ(3.4, 0.24037u"kcal/mol", 8.5)
 
 temperatures = [100, 1300]
-
 
 # This path is joined to sim_folder to run the analysis.
 # This code expects the output from the LAMMPS scripts
@@ -82,7 +86,6 @@ sim_folder_name(temp, seed) = ["T$(temp)", "seed$(seed)"]
 tep_folder = "/mnt/mntsdb/emeitz/ForceConstants/SW_ALM"
 tep_file_name(temp) = "SW_$(temp)K_mixed.jld2"
  
-
 NMA_GPU_Jobs(sim_folder, tep_folder, temperatures,
      sim_folder_name, tep_file_name, n_seeds, pot; order = order)
 
@@ -106,7 +109,7 @@ NMA_GPU_Jobs(sim_folder, tep_folder, temperatures,
 ```
 
 ### Script to Calculate AvgIFCs
-Inside the `scripts` folder are two LAMMPS input files. One for SW silicon (AvgINM_SW_3UC.in`) and another for LJ argon (`AvgINM_LJ.in`). Note that these scripts use the Nose-Hoover instead of Langevin. Running these scripts will produce the output required to calculate a set of AvgIFCs. The code below shows how to call the workflow in `ModalAnalysis.jl`
+Inside the `scripts` folder are two LAMMPS input files. One for SW silicon (`AvgINM_SW_3UC.in`) and another for LJ argon (`AvgINM_LJ.in`). Note that these scripts use the Nose-Hoover instead of Langevin. Running these scripts will produce the output required to calculate a set of AvgIFCs. The code below shows how to call the workflow in `ModalAnalysis.jl`
 
 ```julia
 using ModalAnalysis
