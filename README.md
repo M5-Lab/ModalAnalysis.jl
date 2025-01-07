@@ -87,7 +87,7 @@ tep_folder = "/mnt/mntsdb/emeitz/ForceConstants/SW_ALM"
 tep_file_name(temp) = "SW_$(temp)K_mixed.jld2"
  
 NMA_GPU_Jobs(sim_folder, tep_folder, temperatures,
-     sim_folder_name, tep_file_name, n_seeds, pot; order = order)
+     sim_folder_name, tep_file_name, n_seeds, pot_sw; order = order)
 
 
 #########################################################
@@ -103,7 +103,7 @@ tep_file_name(temp, p) = "SW_$(temp)K_$(p).jld2"
 
 
 NMA_GPU_Jobs(sim_folder, tep_folder, temperatures,
-     sim_folder_name, tep_file_name, n_seeds, pot;
+     sim_folder_name, tep_file_name, n_seeds, pot_sw;
      order = order, other_params_to_sweep = other_params_to_sweep)
 
 ```
