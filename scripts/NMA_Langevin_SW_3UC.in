@@ -1,0 +1,61 @@
+
+units metal
+variable T equal 10
+variable dt equal 1e-3
+variable velocity_seed equal 238277
+variable data_interval equal 40
+variable N_steps equal 2000000
+variable N_steps_equil equal 500000
+
+variable langevin_seed equal 7131999
+variable langevin_damp equal 100*dt
+
+read_data initial_structure_SW_3UC.data
+
+#Set up interatomic potential
+pair_style   sw
+pair_coeff * * /home/emeitz/software/lammps/potentials/Si.sw Si
+timestep     ${dt}
+
+compute 1 all temp
+compute 2 all pe
+compute 3 all ke
+
+
+#Dump equilibrium structure
+dump equilibrium_data all custom 1 equilibrium.atom id type xu yu zu mass
+dump_modify equilibrium_data sort id
+fix eq_eng all print 1 "0 $(c_1:%.7f) $(c_2:%.7f) $(c_3:%.7f)" screen no file equilibrium.energies 
+run 0
+undump equilibrium_data
+unfix eq_eng
+
+#Define and Run Simulation
+velocity all create ${T} ${velocity_seed} dist gaussian mom yes
+
+
+fix 1 all nve
+fix 2 all langevin ${T} ${T} ${langevin_damp} ${langevin_seed} zero yes
+    thermo_style custom step temp etotal
+    thermo 10000
+    run ${N_steps_equil}
+unfix 1
+unfix 2
+
+fix 1 all nve
+fix 2 all langevin ${T} ${T} ${langevin_damp} ${langevin_seed} zero yes
+    reset_timestep 0
+    thermo 500000
+    dump atom_data all custom ${data_interval} dump.atom id type xu yu zu
+    dump_modify atom_data sort id
+    fix thermo_data all ave/time 1 1 ${data_interval} c_1 c_2 c_3 file thermo_data.txt title1 &
+		 "#Thermo information" title2 "#TimeStep Temp PE KE"
+	run ${N_steps}
+unfix 1
+unfix 2
+
+
+
+
+
+
