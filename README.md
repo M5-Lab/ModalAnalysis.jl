@@ -13,7 +13,7 @@ Pkg.add(url = "https://github.com/ejmeitz/ForceConstants.jl.git", rev = "v0.1.3"
 Pkg.add(url = "https://github.com/M5-Lab/ModalAnalysis.jl.git", rev = "v0.1.2")
 
 # You'll also need these to run the scripts below
-Pkg.add(["CUDA", "JLD2", "Unitful"])
+Pkg.add(["CUDA", "JLD2", "Unitful", "SimpleCrystals"])
 ```
 
 ### Generating IFCs with [ForceConstants.jl](https://github.com/ejmeitz/ForceConstants.jl) 
@@ -26,6 +26,7 @@ using ForceConstants
 using JLD2
 using CUDA
 using Unitful
+using SimpleCrystals
 
 pot_lj = LJ(3.4u"Å", 0.24037u"kcal * mol^-1", 8.5u"Å")
 fcc_crystal = FCC(5.2468u"Å", :Ar, SVector(4,4,4)) #from SimpleCrystals.jl
