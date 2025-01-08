@@ -11,6 +11,9 @@ This package is not in the general registry so to install use the command below.
 using Pkg
 Pkg.add(url = "https://github.com/ejmeitz/ForceConstants.jl.git", rev = "v0.1.3")
 Pkg.add(url = "https://github.com/M5-Lab/ModalAnalysis.jl.git", rev = "v0.1.2")
+
+# You'll also need these to run the scripts below
+Pkg.add(["CUDA", "JLD2"])
 ```
 
 ### Generating IFCs with [ForceConstants.jl](https://github.com/ejmeitz/ForceConstants.jl) 
