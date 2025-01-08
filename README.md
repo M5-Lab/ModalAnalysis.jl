@@ -10,7 +10,7 @@ This package is not in the general registry so to install use the command below.
 ```julia
 using Pkg
 Pkg.add(url = "https://github.com/ejmeitz/ForceConstants.jl.git", rev = "v0.1.3")
-Pkg.add(url = "https://github.com/M5-Lab/ModalAnalysis.jl.git", rev = "v0.0.1")
+Pkg.add(url = "https://github.com/M5-Lab/ModalAnalysis.jl.git", rev = "v0.1.2")
 ```
 
 ### Generating IFCs with [ForceConstants.jl](https://github.com/ejmeitz/ForceConstants.jl) 
