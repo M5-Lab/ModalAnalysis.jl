@@ -5,10 +5,11 @@ This package was built to take output from [ForceConstants.jl](https://github.co
 
 This package requires access to an NVIDIA GPU to work.
 
-This package is not in the general registry so to install use the command below. Please change rev to whatever the latest tag is to get up-to-date code!
+This package is not in the general registry so to install use the command below. Please change the revs to whatever the latest tag is to get up-to-date code!
 
 ```julia
 using Pkg
+Pkg.add(url = "https://github.com/ejmeitz/ForceConstants.jl.git", rev = "v0.1.3")
 Pkg.add(url = "https://github.com/M5-Lab/ModalAnalysis.jl.git", rev = "v0.0.1")
 ```
 
