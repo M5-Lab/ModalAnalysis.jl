@@ -50,7 +50,7 @@ cuPsi_mw = CuArray{Float32}(ifc3_analytical.values)
 K3 = mcc3(cuPsi_mw, cuPhi, 256) # there are 768 DoF, so 256 chosen to break calculation up
 
 # These are the inputs required for modal analysis
-jldsave("LJ_0K_IFCs.jld2", dynmat = dynmat, phi = phi, freqs_sq = freqs_sq, K3 = K3)
+jldsave("LJ_0K_IFCs.jld2", dynmat = dynmat.values, phi = phi, freqs_sq = freqs_sq, K3 = K3)
 ```
 
 ### Run LAMMPS to generate data
