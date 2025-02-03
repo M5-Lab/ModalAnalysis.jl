@@ -1,0 +1,23 @@
+&general
+PREFIX = lj444
+MODE   = phonons
+FCSXML = /home/emeitz/ALM_Test/lj444.xml
+
+NKD = 1; KD = Ar
+MASS = 39.95
+/
+
+&cell
+9.9150143138384
+0.0 0.5 0.5
+0.5 0.0 0.5
+0.5 0.5 0.0
+/
+
+&kpoint
+1  # KPMODE = 1: line mode
+G 0.0 0.0 0.0 X 0.5 0.5 0.0 100
+X 0.5 0.5 1.0 K 0.375 0.375 0.75 100
+K 0.375 0.375 0.75 G 0.0 0.0 0.0 100
+G 0.0 0.0 0.0 L 0.5 0.5 0.5 100
+/

@@ -1,0 +1,20 @@
+&general
+PREFIX = si222
+MODE   = phonons
+FCSXML = /home/emeitz/ALM_Test/si222.xml
+
+NKD = 1; KD = Si
+MASS = 28.085
+/
+
+&cell
+10.26121211484
+0.0 0.5 0.5
+0.5 0.0 0.5
+0.5 0.5 0.0
+/
+
+&kpoint
+2
+30 30 30
+/

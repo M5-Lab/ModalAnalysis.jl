@@ -1,0 +1,22 @@
+&general
+PREFIX = lj444
+MODE   = phonons
+FCSXML = /home/emeitz/ALM_Test/lj444.xml
+
+DELTA_E = 0.5
+
+NKD = 1; KD = Ar
+MASS = 39.95
+/
+
+&cell
+9.9150143138384
+0.0 0.5 0.5
+0.5 0.0 0.5
+0.5 0.5 0.0
+/
+
+&kpoint
+2
+30 30 30
+/

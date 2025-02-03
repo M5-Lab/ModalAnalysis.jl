@@ -1,0 +1,22 @@
+&general
+PREFIX = si333
+MODE   = phonons
+FCSXML = /home/emeitz/ALM_Test/si333.xml
+
+DELTA_E = 0.5
+
+NKD = 1; KD = Si
+MASS = 28.085
+/
+
+&cell
+10.26121211484
+0.0 0.5 0.5
+0.5 0.0 0.5
+0.5 0.5 0.0
+/
+
+&kpoint
+2
+50 50 50
+/
